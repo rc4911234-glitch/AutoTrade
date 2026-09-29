@@ -1,5 +1,5 @@
-# Hugging Face Spaces Production Dependencies
-gradio>=5.0.0
+# Streamlit Community Cloud Production Dependencies
+streamlit>=1.38.0
 pydantic>=2.8.0,<3.0.0
 pydantic-settings>=2.4.0,<3.0.0
 flask>=3.0.0,<4.0.0

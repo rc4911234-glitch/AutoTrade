@@ -1,15 +1,3 @@
----
-title: AutoTrade
-emoji: 📈
-colorFrom: green
-colorTo: blue
-sdk: gradio
-sdk_version: 6.29.0
-python_version: '3.12'
-app_file: app.py
-pinned: false
----
-
 # Trad-Auto
 
 **Institutional-Grade Automated Quantitative Trading & Risk-Management Platform for Crypto**
