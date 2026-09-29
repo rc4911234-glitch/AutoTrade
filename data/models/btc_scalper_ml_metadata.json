@@ -1,0 +1,40 @@
+{
+  "model_name": "btc_scalper_ml",
+  "created_at": "2026-09-29T18:45:42",
+  "feature_names": [
+    "ret_1",
+    "ret_3",
+    "ret_5",
+    "ret_15",
+    "ret_30",
+    "wick_upper",
+    "wick_lower",
+    "body_ratio",
+    "is_green",
+    "vol_ratio_5",
+    "vol_ratio_20",
+    "taker_buy_ratio",
+    "dist_ema_9",
+    "dist_ema_21",
+    "dist_ema_50",
+    "ema_ribbon_expansion",
+    "atr_ratio",
+    "volatility_parkinson",
+    "adx_14",
+    "di_diff",
+    "qlib_mom_vol",
+    "qlib_vwap_div"
+  ],
+  "sample_count": 9950,
+  "decision_threshold": 0.55,
+  "performance": {
+    "total_trades": 290,
+    "winning_trades": 103,
+    "losing_trades": 187,
+    "win_rate_pct": 35.51724137931034,
+    "profit_factor": 0.5656196658044377,
+    "total_net_return_pct": -8.348196074301566,
+    "max_drawdown_pct": 8.259289344318457,
+    "sharpe_ratio": -16.327830168474353
+  }
+}

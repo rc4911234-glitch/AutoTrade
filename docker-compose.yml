@@ -1,0 +1,39 @@
+services:
+  trad-auto:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trad_auto_engine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SQLITE_DB_PATH=/app/data/trad_auto.db
+      - DATA_DIR=/app/data
+      - LOG_DIR=/app/logs
+    volumes:
+      - tradauto_data:/app/data
+      - tradauto_logs:/app/logs
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    stop_grace_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  tradauto_data:
+    driver: local
+  tradauto_logs:
+    driver: local
