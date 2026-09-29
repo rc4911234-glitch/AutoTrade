@@ -251,3 +251,6 @@ pytest --cov=config --cov=trad_auto tests/unit
 ## 📜 License
 
 Private & Proprietary. All rights reserved.
+=======
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+>>>>>>> hf/main
