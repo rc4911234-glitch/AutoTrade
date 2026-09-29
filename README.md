@@ -123,8 +123,8 @@ flowchart TD
 
 ```bash
 # Clone the repository
-git clone https://github.com/trad-auto/trad-auto.git
-cd trad-auto
+git clone https://github.com/rc4911234-glitch/AutoTrade.git
+cd AutoTrade
 
 # Create virtual environment
 python -m venv .venv
@@ -144,31 +144,30 @@ cp .env.example .env
 
 ### 3. Running Trad-Auto
 
+#### Web Dashboard & Background Daemon Mode (Production)
+```bash
+python -m trad_auto.main --daemon
+```
+Once started, open the Live Radar Dashboard in your browser:
+* **Dashboard URL:** `http://localhost:5000/dashboard`
+* **Real-time Telemetry:** `http://localhost:5000/api/status`
+
 #### Interactive Terminal CLI Mode
 ```bash
 python -m trad_auto.main --interactive
 ```
 
-Available terminal commands:
-- `status`: Show current session state and metrics.
-- `start paper 5000`: Request authorization for ₹5,000 paper trading budget.
+Available terminal & dashboard commands:
+- `status`: Show current session state, P&L, and ML model conviction.
+- `start paper 1000`: Request authorization for ₹1,000 paper trading budget.
 - `confirm start <code>`: Confirm session activation with short code.
+- `retrain ml`: Trigger an immediate on-demand ML retraining cycle.
 - `positions`: Inspect active open positions and mark-to-market valuations.
 - `pnl today`: Show realized and unrealized P&L today.
 - `pause` / `resume`: Pause or resume entry monitoring.
 - `stop`: Stop trading session (open positions remain protected).
 - `kill`: Emergency Kill Switch (immediately flattens positions and halts).
 - `confirm reset <code>`: Reset kill switch after emergency.
-
-#### Non-Interactive Daemon Mode (Production)
-```bash
-python -m trad_auto.main --daemon
-```
-
-#### One-Shot Health Diagnostic
-```bash
-python -m trad_auto.health
-```
 
 ---
 
