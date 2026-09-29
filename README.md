@@ -1,3 +1,13 @@
+---
+title: AutoTrade
+emoji: 📈
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Trad-Auto
 
 **Institutional-Grade Automated Quantitative Trading & Risk-Management Platform for Crypto**
