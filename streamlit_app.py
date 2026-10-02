@@ -54,20 +54,57 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Global Base */
+    /* Strict Box-Sizing & Viewport Clamping */
+    *, *::before, *::after {
+        box-sizing: border-box !important;
+    }
+    html, body {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
     .stApp {
         background-color: #06090e;
         color: #e2e8f0;
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        width: 100% !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
-    
-    /* Remove default Streamlit top padding */
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    [data-testid="stMainBlockContainer"],
+    .main,
     .block-container {
-        padding-top: 0.6rem !important;
-        padding-bottom: 1.5rem !important;
-        padding-left: 1.2rem !important;
-        padding-right: 1.2rem !important;
+        overflow-x: hidden !important;
         max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Remove default Streamlit top padding and clamp margins */
+    .block-container {
+        padding-top: 0.5rem !important;
+        padding-bottom: 1.5rem !important;
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Prevent Flexbox children from blowing out container widths */
+    div[data-testid="stHorizontalBlock"] {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    div[data-testid="column"] {
+        min-width: 0 !important;
+        overflow-x: hidden !important;
+    }
+    iframe {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     /* Sleek Bloomberg Scrollbars */
@@ -91,30 +128,35 @@ st.markdown(
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 6px 14px;
+        padding: 6px 12px;
         background: #090e17;
         border: 1px solid #1a2333;
         border-radius: 6px;
         margin-bottom: 6px;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden;
     }
     .bb-title-box {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
+        flex-wrap: wrap;
     }
     .bb-logo {
-        font-size: 1.15rem;
+        font-size: 1.10rem;
         font-weight: 900;
         letter-spacing: 0.05em;
         color: #ffb000; /* Bloomberg Amber */
         text-shadow: 0 0 10px rgba(255, 176, 0, 0.3);
     }
     .bb-badge {
-        font-size: 0.68rem;
+        font-size: 0.66rem;
         font-weight: 700;
-        padding: 2px 7px;
+        padding: 2px 6px;
         border-radius: 3px;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.03em;
         text-transform: uppercase;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
@@ -134,9 +176,10 @@ st.markdown(
         border: 1px solid rgba(168, 85, 247, 0.4);
     }
     .bb-clock {
-        font-size: 0.76rem;
+        font-size: 0.74rem;
         color: #94a3b8;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        white-space: nowrap;
     }
 
     /* Slim Single-Line Crypto Ticker Ribbon */
@@ -146,18 +189,23 @@ st.markdown(
         background: #0b111c;
         border: 1px solid #162030;
         border-radius: 5px;
-        padding: 4px 10px;
+        padding: 4px 8px;
         margin-bottom: 8px;
         overflow-x: auto;
-        gap: 16px;
+        overflow-y: hidden;
+        gap: 14px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
     .bb-ticker-item {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
         white-space: nowrap;
+        flex-shrink: 0;
     }
     .bb-ticker-sym {
         font-weight: 800;
@@ -169,14 +217,15 @@ st.markdown(
     }
     .bb-tag-up {
         color: #10b981;
-        font-size: 0.72rem;
+        font-size: 0.70rem;
         font-weight: 700;
     }
     .bb-tag-down {
         color: #ef4444;
-        font-size: 0.72rem;
+        font-size: 0.70rem;
         font-weight: 700;
     }
+
 
     /* Terminal HUD Panel Cards */
     .hud-card {
@@ -608,20 +657,20 @@ tab_floor, tab_qlib, tab_brain, tab_news, tab_risk = st.tabs([
 # TAB 1: 🖥️ MASTER TRADING FLOOR (High-Density Split Layout)
 # ===========================================================================
 with tab_floor:
-    floor_left, floor_right = st.columns([72, 28])
+    floor_left, floor_right = st.columns([70, 30], gap="small")
 
     # -----------------------------------------------------------------------
-    # LEFT PANEL: CHART & BLOTTER (72% width)
+    # LEFT PANEL: CHART & BLOTTER (70% width)
     # -----------------------------------------------------------------------
     with floor_left:
         # Chart Toolbar Header
-        tb_col1, tb_col2, tb_col3 = st.columns([4, 3, 5])
+        tb_col1, tb_col2, tb_col3 = st.columns([3, 3, 4], gap="small")
         with tb_col1:
             chart_sym = st.selectbox("Asset", ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"], index=0, label_visibility="collapsed")
         with tb_col2:
             chart_tf = st.selectbox("Timeframe", ["1m", "5m", "15m", "1h"], index=2, label_visibility="collapsed")
         with tb_col3:
-            chart_engine = st.radio("Engine", ["🌐 TradingView Pro", "📊 Plotly Quant (EMA 9/21/50)"], horizontal=True, label_visibility="collapsed")
+            chart_engine = st.radio("Engine", ["🌐 TradingView", "📊 Plotly Quant"], horizontal=True, label_visibility="collapsed")
 
         # Chart Render
         if chart_engine == "🌐 TradingView Pro":
@@ -835,7 +884,7 @@ with tab_floor:
             unsafe_allow_html=True,
         )
 
-        eb_col1, eb_col2 = st.columns(2)
+        eb_col1, eb_col2 = st.columns(2, gap="small")
         if eb_col1.button("▶ Start Paper", type="primary", use_container_width=True):
             st.session_state["_last_cmd_result"] = run_cmd("start paper 1000")
             st.rerun()
@@ -843,15 +892,20 @@ with tab_floor:
             st.session_state["_last_cmd_result"] = run_cmd("close btc")
             st.rerun()
 
-        eb_r2_1, eb_r2_2, eb_r2_3 = st.columns(3)
+        eb_r2_1, eb_r2_2 = st.columns(2, gap="small")
         if eb_r2_1.button("Trade BTC", use_container_width=True):
             st.session_state["_last_cmd_result"] = run_cmd("trade btc")
             st.rerun()
         if eb_r2_2.button("Trade ETH", use_container_width=True):
             st.session_state["_last_cmd_result"] = run_cmd("trade eth")
             st.rerun()
-        if eb_r2_3.button("Trade SOL", use_container_width=True):
+
+        eb_r3_1, eb_r3_2 = st.columns(2, gap="small")
+        if eb_r3_1.button("Trade SOL", use_container_width=True):
             st.session_state["_last_cmd_result"] = run_cmd("trade sol")
+            st.rerun()
+        if eb_r3_2.button("🔄 Retrain ML", use_container_width=True):
+            st.session_state["_last_cmd_result"] = run_cmd("retrain ml")
             st.rerun()
 
         cmd_input = st.text_input("Terminal Command", placeholder="status, trade btc, close eth, retrain ml...", label_visibility="collapsed")
