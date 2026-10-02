@@ -222,7 +222,9 @@ class TradingEngine:
             self.market_data_adapter = market_data_adapter
             if hasattr(market_data_adapter, "_watchdog"):
                 self.feed_watchdog = getattr(market_data_adapter, "_watchdog", None)
-        elif self.settings.trading_mode == "LIVE":
+        elif self.settings.trading_mode in ("LIVE", "PAPER"):
+            # Both LIVE and PAPER use real Binance WebSocket for market data.
+            # PAPER differs only in execution (SimulatedExecutionAdapter).
             ws_url = (
                 self.settings.binance_ws_base_url
                 if self.settings.binance_ws_base_url
