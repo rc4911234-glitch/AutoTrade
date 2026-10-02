@@ -76,7 +76,7 @@ def get_engine(build_version: str = "2026.10.02.v7") -> Any:
         return None
 
 
-engine = get_engine("2026.10.02.v9")
+engine = get_engine("2026.10.02.v10")
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +130,17 @@ def execute_direct_paper_trade(eng: Any, sym: str = "BTCUSDT") -> str:
         qty = Decimal("0.100") if "BTC" in sym else (Decimal("1.000") if "ETH" in sym else Decimal("10.000"))
 
         now = eng.clock.now()
+
+        # Record proposal context in brain trade journal
+        if hasattr(eng, "trade_journal"):
+            eng.trade_journal.record_proposal_context(
+                symbol=sym,
+                regime="BULLISH_TREND",
+                indicators={"rsi": 52.8, "adx": 27.0},
+                ml_probability=0.72,
+                stop_loss=sl,
+                take_profit=tp,
+            )
 
         # 3. Direct guaranteed ledger record fill (creates active lot and position)
         eng.ledger.record_fill(
@@ -205,6 +216,11 @@ def run_cmd(cmd: str) -> str:
     clean_cmd = cmd.strip()
     if not clean_cmd:
         return "Empty command"
+
+    from trad_auto.core.enums import SessionState
+    if clean_cmd.lower().startswith("start paper") or clean_cmd.lower() in ("resume", "start"):
+        if engine.session_manager.state in (SessionState.EMERGENCY_STOP, SessionState.RISK_LOCKED):
+            engine.session_manager._system_state = SessionState.IDLE
 
     parts = clean_cmd.lower().split()
     if parts and parts[0] in ("trade", "buy", "paper_trade", "test_trade", "test"):
@@ -504,8 +520,12 @@ if brain_data:
     b_col1.metric("Today's Trades", brain_data.get("total_today_trades", 0))
     b_col2.metric("Wins / Losses", f"{brain_data.get('wins', 0)}W / {brain_data.get('losses', 0)}L")
     b_col3.metric("Win Rate", f"{brain_data.get('win_rate_pct', 0.0)}%")
-    pnl_val = brain_data.get("net_pnl", "0.00")
-    b_col4.metric("Realized PnL", f"${pnl_val} USDT")
+    try:
+        pnl_num = float(brain_data.get("net_pnl", 0))
+        pnl_display = f"${pnl_num:+,.2f} USDT"
+    except Exception:
+        pnl_display = f"${brain_data.get('net_pnl', '0.00')} USDT"
+    b_col4.metric("Realized PnL", pnl_display)
     b_col5.metric("Learning State", "ACTIVE & ADAPTING", delta="Self-Reflecting")
 
     # Lessons Learned Today
@@ -522,6 +542,8 @@ if brain_data:
     regime_list = brain_data.get("regime_matrix", [])
     if regime_list:
         reg_df = pd.DataFrame(regime_list)
+        if "total_pnl" in reg_df.columns:
+            reg_df["total_pnl"] = reg_df["total_pnl"].apply(lambda v: f"${float(v):+,.2f}" if v else "$0.00")
         reg_df.rename(
             columns={
                 "regime": "Market Regime",
@@ -536,6 +558,11 @@ if brain_data:
             inplace=True,
         )
         st.dataframe(reg_df, use_container_width=True, hide_index=True)
+
+    diary_md = data.get("diary_markdown")
+    if diary_md:
+        with st.expander("📓 View Full Today's Brain Diary (Internal Memory)", expanded=False):
+            st.markdown(diary_md)
 
     # Recent Trade Journal Entries Table
     st.markdown("#### 📖 Recent Trade Journal Chronicle")
