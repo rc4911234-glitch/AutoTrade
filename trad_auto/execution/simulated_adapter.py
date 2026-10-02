@@ -71,8 +71,8 @@ class SimulatedExecutionAdapter(ExecutionAdapter):
                 has_spread = quote.ask_price > quote.bid_price
                 if has_spread:
                     crosses_spread = (
-                        order.side == OrderSide.BUY and order.price > quote.ask_price
-                    ) or (order.side == OrderSide.SELL and order.price < quote.bid_price)
+                        order.side == OrderSide.BUY and order.price >= quote.ask_price
+                    ) or (order.side == OrderSide.SELL and order.price <= quote.bid_price)
                 else:
                     crosses_spread = False
 

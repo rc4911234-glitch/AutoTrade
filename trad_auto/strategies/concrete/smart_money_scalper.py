@@ -224,12 +224,9 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         if risk_distance <= ZERO_DECIMAL:
             return []
 
-        # 1. Volume confirmation: allow continuation if volume is adequate or if momentum is accelerating
-        if vol_avg is not None and vol_avg > ZERO_DECIMAL:
-            if bar.volume < (vol_avg * self.volume_multiplier):
-                # If price is within tight noise of trend EMA, require volume confirmation
-                if abs(bar.close - trend_val) < risk_distance:
-                    return []
+        # 1. Volume filter: Require volume to exceed the configured multiplier of average volume
+        if bar.volume < (vol_avg * self.volume_multiplier):
+            return []
 
         # 2. Qlib Alpha Microstructure Check
         qlib_snapshot: QlibAlphaSnapshot | None = None
