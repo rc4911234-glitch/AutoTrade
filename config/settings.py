@@ -143,6 +143,18 @@ class Settings(BaseSettings):
     )
 
     # Persistence & File Storage
+    database_url: str = Field(
+        default="",
+        description="PostgreSQL / Supabase connection URL. If set, Trad-Auto connects to Supabase PostgreSQL.",
+    )
+    supabase_url: str = Field(
+        default="",
+        description="Supabase project URL.",
+    )
+    supabase_key: str = Field(
+        default="",
+        description="Supabase anon/service-role API key.",
+    )
     sqlite_db_path: str = Field(
         default="trad_auto.db",
         description="Path to SQLite database file for deduplication and audit storage.",

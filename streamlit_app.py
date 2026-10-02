@@ -48,6 +48,12 @@ def get_engine(build_version: str = "2026.10.02.v7") -> Any:
         settings.trading_mode = "PAPER"
         settings.enable_web_dashboard = False  # Streamlit hosts UI
 
+        # Check for Supabase DATABASE_URL in Streamlit secrets or environment
+        if hasattr(st, "secrets") and "DATABASE_URL" in st.secrets:
+            settings.database_url = st.secrets["DATABASE_URL"]
+        elif os.getenv("DATABASE_URL"):
+            settings.database_url = os.getenv("DATABASE_URL")
+
         eng = TradingEngine(settings=settings)
         eng.initialize(rehydrate=True)
         eng.start()
@@ -76,7 +82,7 @@ def get_engine(build_version: str = "2026.10.02.v7") -> Any:
         return None
 
 
-engine = get_engine("2026.10.02.v10")
+engine = get_engine("2026.10.02.v11")
 
 
 # ---------------------------------------------------------------------------
@@ -255,8 +261,9 @@ fng = market.get("fear_greed", {})
 # UI Header
 # ---------------------------------------------------------------------------
 st.markdown("# ⚡ TRAD-AUTO: Institutional Market & Quant Terminal")
+db_badge = "☁️ Supabase PostgreSQL (Cloud Active)" if (engine and getattr(engine.db_manager, "is_postgres", False)) else "💾 Local SQLite (Embedded)"
 st.caption(
-    "**24/7 Autonomous Microstructure Machine Learning • Broad Market Intelligence • Aladdin-Grade Risk Protection**"
+    f"**24/7 Autonomous Microstructure Machine Learning • Broad Market Intelligence • Aladdin-Grade Risk Protection • Database: {db_badge}**"
 )
 
 # ---------------------------------------------------------------------------

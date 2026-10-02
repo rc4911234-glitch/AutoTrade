@@ -101,6 +101,7 @@ class TradingEngine:
         self.db_manager: DatabaseManager = db_manager or DatabaseManager(
             db_path=self.settings.sqlite_db_path,
             busy_timeout_ms=self.settings.sqlite_busy_timeout_ms,
+            database_url=self.settings.database_url,
         )
 
         # 1. Repositories and Audit Logging
@@ -352,7 +353,7 @@ class TradingEngine:
 
         # 11. Continuous Learning & Trade Journaling Brain
         journal_path = Path(self.settings.sqlite_db_path).parent / "trade_journal.jsonl"
-        self.trade_journal = TradeJournal(filepath=journal_path)
+        self.trade_journal = TradeJournal(filepath=journal_path, db_manager=self.db_manager)
         self.post_mortem = PostMortemAnalyzer()
         self.adaptive_policy = AdaptivePolicyEngine()
         self.learning_reporter = LearningReporter(

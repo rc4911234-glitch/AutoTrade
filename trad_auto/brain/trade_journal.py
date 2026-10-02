@@ -19,9 +19,14 @@ logger = logging.getLogger(__name__)
 class TradeJournal:
     """Thread-safe persistence engine and episodic memory journal for all trades."""
 
-    def __init__(self, filepath: Path | str = "data/trade_journal.jsonl") -> None:
+    def __init__(
+        self,
+        filepath: Path | str = "data/trade_journal.jsonl",
+        db_manager: Any | None = None,
+    ) -> None:
         self.filepath = Path(filepath)
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
+        self._db_manager = db_manager
         self._lock = threading.RLock()
         self._entries: list[TradeJournalEntry] = []
         self._open_entries: dict[str, TradeJournalEntry] = {}
@@ -29,34 +34,79 @@ class TradeJournal:
         self._load_existing_journal()
 
     def _load_existing_journal(self) -> None:
-        """Loads historical journal entries from the JSONL storage."""
-        if not self.filepath.exists():
-            return
-
+        """Loads historical journal entries from JSONL storage and Supabase/database."""
         with self._lock:
-            try:
-                with open(self.filepath, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            data = json.loads(line)
-                            entry = TradeJournalEntry.from_dict(data)
-                            if entry.outcome == TradeOutcome.OPEN:
-                                self._open_entries[entry.symbol] = entry
-                            else:
-                                self._entries.append(entry)
-                        except Exception as e:
-                            logger.warning("Failed to parse journal line: %s, err=%s", line, e)
-                logger.info(
-                    "TradeJournal loaded %d closed entries and %d open entries from %s",
-                    len(self._entries),
-                    len(self._open_entries),
-                    self.filepath,
-                )
-            except Exception as e:
-                logger.error("Error reading trade journal %s: %s", self.filepath, e)
+            # 1. Load from JSONL file if available
+            if self.filepath.exists():
+                try:
+                    with open(self.filepath, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                data = json.loads(line)
+                                entry = TradeJournalEntry.from_dict(data)
+                                if entry.outcome == TradeOutcome.OPEN:
+                                    self._open_entries[entry.symbol] = entry
+                                else:
+                                    self._entries.append(entry)
+                            except Exception as e:
+                                logger.warning("Failed to parse journal line: %s, err=%s", line, e)
+                except Exception as e:
+                    logger.error("Error reading trade journal %s: %s", self.filepath, e)
+
+            # 2. Rehydrate from DatabaseManager (Supabase PostgreSQL / SQLite)
+            if self._db_manager is not None:
+                try:
+                    with self._db_manager.transaction() as conn:
+                        cur = conn.execute("SELECT * FROM trade_journal ORDER BY entry_time ASC")
+                        rows = cur.fetchall()
+                        seen_ids = {e.trade_id for e in self._entries}
+                        for r in rows:
+                            t_id = r["trade_id"]
+                            if t_id in seen_ids:
+                                continue
+                            try:
+                                entry = TradeJournalEntry(
+                                    trade_id=t_id,
+                                    symbol=r["symbol"],
+                                    side=r["side"],
+                                    entry_price=Decimal(str(r["entry_price"])),
+                                    exit_price=Decimal(str(r["exit_price"])) if r["exit_price"] else None,
+                                    quantity=Decimal(str(r["quantity"])),
+                                    entry_time=datetime.fromisoformat(r["entry_time"]) if "T" in str(r["entry_time"]) else datetime.now(UTC),
+                                    exit_time=datetime.fromisoformat(r["exit_time"]) if r["exit_time"] and "T" in str(r["exit_time"]) else None,
+                                    holding_seconds=float(r["holding_seconds"] or 0.0),
+                                    entry_regime=r["entry_regime"] or "UNKNOWN",
+                                    entry_indicators=json.loads(r["entry_indicators"]) if r["entry_indicators"] else {},
+                                    ml_probability=float(r["ml_probability"]) if r["ml_probability"] is not None else None,
+                                    stop_loss=Decimal(str(r["stop_loss"] or "0")),
+                                    take_profit=Decimal(str(r["take_profit"] or "0")),
+                                    outcome=TradeOutcome(r["outcome"]),
+                                    exit_reason=ExitReason(r["exit_reason"]),
+                                    realized_pnl=Decimal(str(r["realized_pnl"] or "0")),
+                                    return_pct=Decimal(str(r["return_pct"] or "0")),
+                                    r_multiple=Decimal(str(r["r_multiple"] or "0")),
+                                    post_mortem_analysis=r["post_mortem_analysis"] or "",
+                                    lesson_learned=r["lesson_learned"] or "",
+                                    adaptation_applied=r["adaptation_applied"] or "",
+                                )
+                                if entry.outcome == TradeOutcome.OPEN:
+                                    self._open_entries[entry.symbol] = entry
+                                else:
+                                    self._entries.append(entry)
+                                seen_ids.add(t_id)
+                            except Exception as parse_err:
+                                logger.debug("Failed to rehydrate trade row %s: %s", t_id, parse_err)
+                except Exception as db_err:
+                    logger.debug("Database trade_journal rehydration query skipped/failed: %s", db_err)
+
+            logger.info(
+                "TradeJournal loaded %d closed entries and %d open entries (Storage: Local JSONL + Database).",
+                len(self._entries),
+                len(self._open_entries),
+            )
 
     def _append_to_file(self, entry: TradeJournalEntry) -> None:
         """Appends a single entry to JSONL storage."""
@@ -65,6 +115,62 @@ class TradeJournal:
                 f.write(json.dumps(entry.to_dict()) + "\n")
         except Exception as e:
             logger.error("Failed to append journal entry %s to disk: %s", entry.trade_id, e)
+
+    def _save_to_db(self, entry: TradeJournalEntry) -> None:
+        """Saves or updates journal entry in the DatabaseManager (Supabase PostgreSQL / SQLite)."""
+        if self._db_manager is None:
+            return
+        try:
+            with self._db_manager.transaction() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO trade_journal (
+                        trade_id, symbol, side, entry_price, exit_price, quantity,
+                        entry_time, exit_time, holding_seconds, entry_regime,
+                        entry_indicators, ml_probability, stop_loss, take_profit,
+                        outcome, exit_reason, realized_pnl, return_pct, r_multiple,
+                        post_mortem_analysis, lesson_learned, adaptation_applied
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(trade_id) DO UPDATE SET
+                        exit_price=excluded.exit_price,
+                        exit_time=excluded.exit_time,
+                        holding_seconds=excluded.holding_seconds,
+                        outcome=excluded.outcome,
+                        exit_reason=excluded.exit_reason,
+                        realized_pnl=excluded.realized_pnl,
+                        return_pct=excluded.return_pct,
+                        r_multiple=excluded.r_multiple,
+                        post_mortem_analysis=excluded.post_mortem_analysis,
+                        lesson_learned=excluded.lesson_learned,
+                        adaptation_applied=excluded.adaptation_applied
+                    """,
+                    (
+                        entry.trade_id,
+                        entry.symbol,
+                        entry.side,
+                        str(entry.entry_price),
+                        str(entry.exit_price) if entry.exit_price is not None else None,
+                        str(entry.quantity),
+                        entry.entry_time.isoformat(),
+                        entry.exit_time.isoformat() if entry.exit_time is not None else None,
+                        entry.holding_seconds,
+                        entry.entry_regime,
+                        json.dumps(entry.entry_indicators),
+                        entry.ml_probability,
+                        str(entry.stop_loss),
+                        str(entry.take_profit),
+                        entry.outcome.value,
+                        entry.exit_reason.value,
+                        str(entry.realized_pnl),
+                        str(entry.return_pct),
+                        str(entry.r_multiple),
+                        entry.post_mortem_analysis,
+                        entry.lesson_learned,
+                        entry.adaptation_applied,
+                    ),
+                )
+        except Exception as e:
+            logger.debug("Failed to persist journal entry %s to database: %s", entry.trade_id, e)
 
     def record_proposal_context(
         self,
@@ -115,6 +221,8 @@ class TradeJournal:
                 outcome=TradeOutcome.OPEN,
             )
             self._open_entries[symbol] = entry
+            self._append_to_file(entry)
+            self._save_to_db(entry)
             logger.info("TradeJournal recorded OPEN trade %s for %s @ %s", entry.trade_id, symbol, entry_price)
             return entry
 
@@ -179,6 +287,7 @@ class TradeJournal:
 
             self._entries.append(entry)
             self._append_to_file(entry)
+            self._save_to_db(entry)
             logger.info(
                 "TradeJournal finalized trade %s: Outcome=%s, PnL=%s USDT, R=%s, Reason=%s",
                 entry.trade_id,
@@ -195,7 +304,7 @@ class TradeJournal:
             return ExitReason.UNKNOWN
 
         if entry.take_profit > ZERO_DECIMAL:
-            # Check if close to take-profit (within 0.15%)
+            # Check if close to take-profit (within 0.2%)
             tp_dist = abs(entry.exit_price - entry.take_profit) / entry.take_profit
             if tp_dist <= Decimal("0.002"):
                 return ExitReason.TAKE_PROFIT_HIT
