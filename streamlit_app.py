@@ -48,11 +48,17 @@ def get_engine(build_version: str = "2026.10.02.v7") -> Any:
         settings.trading_mode = "PAPER"
         settings.enable_web_dashboard = False  # Streamlit hosts UI
 
-        # Check for Supabase DATABASE_URL in Streamlit secrets or environment
+        # Check for Supabase DATABASE_URL in Streamlit secrets or environment or auto-fallback
+        supabase_cloud_url = (
+            "postgresql://postgres.zewxjwmqowbpdppnixjc:Tradeauto%405755"
+            "@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres?sslmode=require"
+        )
         if hasattr(st, "secrets") and "DATABASE_URL" in st.secrets:
             settings.database_url = st.secrets["DATABASE_URL"]
         elif os.getenv("DATABASE_URL"):
             settings.database_url = os.getenv("DATABASE_URL")
+        else:
+            settings.database_url = supabase_cloud_url
 
         eng = TradingEngine(settings=settings)
         eng.initialize(rehydrate=True)
@@ -82,7 +88,7 @@ def get_engine(build_version: str = "2026.10.02.v7") -> Any:
         return None
 
 
-engine = get_engine("2026.10.02.v11")
+engine = get_engine("2026.10.02.v12")
 
 
 # ---------------------------------------------------------------------------
