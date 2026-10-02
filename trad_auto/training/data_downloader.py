@@ -96,10 +96,20 @@ class BinanceDataDownloader:
             with urllib.request.urlopen(req, timeout=self.timeout_seconds) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
         except Exception as exc:
-            logger.warning(
-                "Failed to fetch kline batch from Binance API: %s.", exc
-            )
-            return []
+            # Fallback for US cloud environments (e.g. Streamlit Cloud hosted in US)
+            try:
+                fallback_url = f"https://api.binance.us/api/v3/klines?{query_str}"
+                fallback_req = urllib.request.Request(
+                    fallback_url,
+                    headers={"User-Agent": "Mozilla/5.0 TradAuto/1.0"},
+                )
+                with urllib.request.urlopen(fallback_req, timeout=self.timeout_seconds) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+            except Exception:
+                logger.warning(
+                    "Failed to fetch kline batch from Binance API (%s): %s.", url, exc
+                )
+                return []
 
         candles: list[dict[str, Any]] = []
         for raw in data:

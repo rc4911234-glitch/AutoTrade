@@ -239,16 +239,19 @@ qcol5.metric(
 # SECTION 5: LIVE BTCUSDT RECENT CANDLE TREND
 # ---------------------------------------------------------------------------
 if engine is not None and hasattr(engine, "bar_store"):
-    bars = engine.bar_store.get_bars("BTCUSDT", "1m", limit=40)
-    if bars:
-        st.markdown("### 📈 Live BTCUSDT 1-Minute Micro-Trend (Last 40 Candles)")
-        chart_data = pd.DataFrame(
-            {
-                "Time": [b.timestamp.strftime("%H:%M") for b in bars],
-                "Price": [float(b.close) for b in bars],
-            }
-        ).set_index("Time")
-        st.line_chart(chart_data, height=220)
+    try:
+        bars = engine.bar_store.get_bars("BTCUSDT", "1m", count=40)
+        if bars:
+            st.markdown("### 📈 Live BTCUSDT 1-Minute Micro-Trend (Last 40 Candles)")
+            chart_data = pd.DataFrame(
+                {
+                    "Time": [b.timestamp.strftime("%H:%M") for b in bars],
+                    "Price": [float(b.close) for b in bars],
+                }
+            ).set_index("Time")
+            st.line_chart(chart_data, height=220)
+    except Exception as exc:
+        pass
 
 # ---------------------------------------------------------------------------
 # SECTION 6: CONTROL ACTIONS & COMMAND TERMINAL
