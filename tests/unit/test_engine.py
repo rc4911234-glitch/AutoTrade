@@ -322,6 +322,17 @@ class TestTradingEngineLifecycle:
         assert res_status["success"] is True
         assert "IDLE" in res_status["message"]
 
+        # Test trade execution via dashboard
+        res_trade = engine.execute_dashboard_command("trade btc")
+        assert res_trade["success"] is True
+        assert "Executed BTCUSDT Paper Trade" in res_trade["message"]
+
+        post_trade_snap = engine.get_dashboard_snapshot()
+        assert post_trade_snap["open_positions_count"] == 1
+        assert len(post_trade_snap["open_positions"]) == 1
+        assert post_trade_snap["open_positions"][0]["symbol"] == "BTCUSDT"
+        assert post_trade_snap["open_positions"][0]["side"] == "LONG"
+
         # Test empty command
         res_empty = engine.execute_dashboard_command("  ")
         assert res_empty["success"] is False

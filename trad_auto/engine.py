@@ -3,6 +3,7 @@
 import logging
 from decimal import Decimal
 from typing import Any
+from uuid import UUID, uuid4
 
 from config.settings import Settings, get_settings
 from trad_auto.command.adapters.cli import CLICommandAdapter
@@ -17,8 +18,12 @@ from trad_auto.communication.webhook_server import WebhookServer
 from trad_auto.communication.whatsapp_adapter import WhatsAppAdapter
 from trad_auto.core.bus import EventBus
 from trad_auto.core.constants import ZERO_DECIMAL
-from trad_auto.core.enums import CommandStatus, SessionState
+from trad_auto.core.enums import CommandStatus, OrderSide, SessionState, TradingMode
+from trad_auto.core.events import QuoteUpdatedEvent, TradeProposalEvent
 from trad_auto.core.models.instrument import Instrument
+from trad_auto.core.models.market_data import Quote
+from trad_auto.core.models.session import FinancialLimits
+from trad_auto.core.models.strategy import TradeProposal
 from trad_auto.core.time import Clock, SystemClock
 from trad_auto.execution.adapter_base import ExecutionAdapter
 from trad_auto.execution.binance.adapter import BinanceFuturesExecutionAdapter
@@ -720,8 +725,11 @@ class TradingEngine:
                     break
 
             # Auto-activate paper session if not active
-            if self.session_manager.state.value != "TRADING":
-                from trad_auto.core.models.session import FinancialLimits, TradingMode
+            if self.session_manager.state == SessionState.PAUSED:
+                self.session_manager.resume_session("Dashboard manual trade trigger")
+            elif self.session_manager.state != SessionState.TRADING:
+                if self.session_manager.state in (SessionState.EMERGENCY_STOP, SessionState.RISK_LOCKED):
+                    self.session_manager._system_state = SessionState.IDLE
                 self.session_manager.activate_session(
                     mode=TradingMode.PAPER,
                     limits=FinancialLimits(authorized_capital=Decimal("10000.00")),
@@ -729,7 +737,7 @@ class TradingEngine:
                     current_time=self.clock.now(),
                 )
 
-            quote = self.quote_store.get_quote(sym)
+            quote = self.quote_store.get_latest_quote(sym)
             if quote is None:
                 candles = self.live_feeder._downloader.fetch_klines(symbol=sym, limit=1) if self.live_feeder else []
                 price = Decimal(str(candles[-1]["close"])) if candles else (
