@@ -53,6 +53,7 @@ htmlcov/
 *.sqlite
 *.sqlite3
 data/*.db*
+data/*.jsonl
 data/cache/
 data/historical/
 data/parquet/

@@ -298,6 +298,19 @@ class TradeJournal:
             )
             return entry
 
+    def update_post_mortem(self, entry: TradeJournalEntry) -> None:
+        """Persists the post-mortem analysis and lessons into storage & database."""
+        with self._lock:
+            self._save_to_db(entry)
+            try:
+                with open(self.filepath, "w", encoding="utf-8") as f:
+                    for e in self._entries:
+                        f.write(json.dumps(e.to_dict()) + "\n")
+                    for e in self._open_entries.values():
+                        f.write(json.dumps(e.to_dict()) + "\n")
+            except Exception as e:
+                logger.error("Failed to update journal file with post-mortem: %s", e)
+
     def _infer_exit_reason(self, entry: TradeJournalEntry) -> ExitReason:
         """Infers the most likely market mechanism that closed the trade."""
         if entry.exit_price is None:

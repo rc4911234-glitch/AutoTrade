@@ -956,6 +956,7 @@ class TradingEngine:
         if closed_entry:
             self.post_mortem.analyze_trade(closed_entry)
             self.adaptive_policy.process_trade_outcome(closed_entry)
+            self.trade_journal.update_post_mortem(closed_entry)
 
     def __enter__(self) -> "TradingEngine":
         self.initialize()
