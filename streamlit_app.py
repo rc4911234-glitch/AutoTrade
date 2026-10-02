@@ -197,6 +197,22 @@ pcol3.metric("Today Realized P&L", f"${rpnl:+.2f}", delta=f"{rpnl:+.2f}")
 pcol4.metric("Unrealized P&L", f"${upnl:+.2f}", delta=f"{upnl:+.2f}")
 pcol5.metric("Open Positions", positions)
 
+open_pos_list = data.get("open_positions", [])
+if open_pos_list:
+    st.markdown("##### ⚡ Active Open Positions")
+    pos_data = [
+        {
+            "Symbol": p.get("symbol"),
+            "Side": "🟢 LONG" if p.get("side") == "LONG" else "🔴 SHORT",
+            "Quantity": p.get("quantity"),
+            "Entry Price": f"${float(p.get('entry_price', 0)):,.2f}",
+            "Mark Price": f"${float(p.get('mark_price', 0)):,.2f}",
+            "Unrealized P&L": f"${float(p.get('unrealized_pnl', 0)):+,.2f}",
+        }
+        for p in open_pos_list
+    ]
+    st.dataframe(pos_data, use_container_width=True)
+
 # ---------------------------------------------------------------------------
 # SECTION 4: 22-FACTOR QUANT ML & STATISTICAL MARKET REGIME
 # ---------------------------------------------------------------------------
@@ -357,7 +373,7 @@ if os.path.exists(meta_file):
 # ---------------------------------------------------------------------------
 st.divider()
 st.markdown("### 🎮 Control Center & Terminal")
-bcol1, bcol2, bcol3, bcol4, bcol5 = st.columns(5)
+bcol1, bcol2, bcol3, bcol4, bcol5, bcol6 = st.columns(6)
 
 if bcol1.button("▶ Start Paper (1000 USDT)", type="primary", use_container_width=True):
     st.info(run_cmd("start paper 1000"))
@@ -368,10 +384,15 @@ if bcol2.button("⏸ Pause", use_container_width=True):
 if bcol3.button("▶ Resume", use_container_width=True):
     st.success(run_cmd("resume"))
 
-if bcol4.button("🔄 Retrain ML Now", use_container_width=True):
+if bcol4.button("⚡ Test Paper Trade", use_container_width=True):
+    st.info(run_cmd("trade btc"))
+    time.sleep(1)
+    st.rerun()
+
+if bcol5.button("🔄 Retrain ML Now", use_container_width=True):
     st.info(run_cmd("retrain ml"))
 
-if bcol5.button("🚨 KILL SWITCH", type="secondary", use_container_width=True):
+if bcol6.button("🚨 KILL SWITCH", type="secondary", use_container_width=True):
     st.error(run_cmd("kill"))
 
 cmd = st.text_input(

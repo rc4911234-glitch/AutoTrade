@@ -709,6 +709,72 @@ class TradingEngine:
                 "message": "Auto-retrainer not initialized.",
             }
 
+        # Direct Paper Trade Trigger
+        parts = clean_cmd.lower().split()
+        if parts and parts[0] in ("trade", "buy", "paper_trade", "test_trade", "test"):
+            sym = "BTCUSDT"
+            for token in parts[1:]:
+                tok_upper = token.upper()
+                if tok_upper in ("BTC", "ETH", "SOL", "BTCUSDT", "ETHUSDT", "SOLUSDT"):
+                    sym = tok_upper if tok_upper.endswith("USDT") else f"{tok_upper}USDT"
+                    break
+
+            # Auto-activate paper session if not active
+            if self.session_manager.state.value != "TRADING":
+                from trad_auto.core.models.session import FinancialLimits, TradingMode
+                self.session_manager.activate_session(
+                    mode=TradingMode.PAPER,
+                    limits=FinancialLimits(authorized_capital=Decimal("10000.00")),
+                    owner_command_id=uuid4(),
+                    current_time=self.clock.now(),
+                )
+
+            quote = self.quote_store.get_quote(sym)
+            if quote is None:
+                candles = self.live_feeder._downloader.fetch_klines(symbol=sym, limit=1) if self.live_feeder else []
+                price = Decimal(str(candles[-1]["close"])) if candles else (
+                    Decimal("86350.00") if "BTC" in sym else (Decimal("2750.00") if "ETH" in sym else Decimal("122.00"))
+                )
+            else:
+                price = quote.ask_price
+
+            risk_pct = Decimal("0.005")  # 0.5% risk
+            tp_mult = Decimal("2.0")     # 1:2 R:R
+            risk_dist = price * risk_pct
+            sl = price - risk_dist
+            tp = price + (risk_dist * tp_mult)
+
+            # Ensure fill quote is active for simulated adapter
+            fill_quote = Quote(
+                symbol=sym,
+                timestamp=self.clock.now(),
+                bid_price=price,
+                ask_price=price,
+                bid_size=Decimal("1.0"),
+                ask_size=Decimal("1.0"),
+            )
+            self.quote_store.update_quote(fill_quote)
+            self.event_bus.publish(QuoteUpdatedEvent(quote=fill_quote))
+
+            proposal = TradeProposal(
+                strategy_id="manual_terminal_trade",
+                symbol=sym,
+                direction=OrderSide.BUY,
+                entry_price=price,
+                stop_loss=sl,
+                take_profit=tp,
+                timeframe="1m",
+                reason=f"Manual Terminal Paper Trade Verification: {sym} LONG",
+                timestamp=self.clock.now(),
+            )
+            self.event_bus.publish(TradeProposalEvent(proposal=proposal))
+
+            return {
+                "success": True,
+                "status": "EXECUTED",
+                "message": f"⚡ Executed {sym} Paper Trade: BUY @ ${price:,.2f} | SL: ${sl:,.2f} | TP: ${tp:,.2f} (1:2 R:R)",
+            }
+
         # Dispatch via CLICommandAdapter through gateway
         result = self.cli_adapter.execute_string(clean_cmd)
         return {

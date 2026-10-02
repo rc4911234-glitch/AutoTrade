@@ -57,8 +57,8 @@ class WhatsAppNotifier:
         """Sends a WhatsApp alert to the owner, swallowing send failures."""
         try:
             self._client.send_message(to=self._owner_phone, body=body)
-        except Exception:
-            logger.exception("Failed to send WhatsApp alert: %s", body[:100])
+        except Exception as exc:
+            logger.warning("WhatsApp alert delivery skipped: %s (Reason: %s)", body.splitlines()[0] if body else "empty", exc)
 
     def _on_position_opened(self, event: PositionOpenedEvent) -> None:
         """Formats and sends a new position entry alert."""
