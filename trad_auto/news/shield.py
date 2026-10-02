@@ -37,7 +37,7 @@ class NewsVolatilityShield:
         sentiment_analyzer: NewsSentimentAnalyzer | None = None,
         event_bus: EventBus | None = None,
         clock: Clock | None = None,
-        breaking_news_blackout_minutes: int = 30,
+        breaking_news_blackout_minutes: int = 10,
         enforce_sentiment_alignment: bool = True,
         sentiment_rejection_threshold: Decimal = Decimal("0.60"),
     ) -> None:
@@ -63,21 +63,37 @@ class NewsVolatilityShield:
         now = self.clock.now()
         result = self.sentiment_analyzer.analyze_article(article, now=now)
 
-        symbol = article.symbols[0] if article.symbols else "*"
-        self._recent_sentiment.append((now, symbol, result))
+        symbols = [s.upper() for s in article.symbols] if article.symbols else []
+        if not symbols:
+            title_lower = article.title.lower()
+            if any(term in title_lower for term in ("btc", "bitcoin")):
+                symbols = ["BTCUSDT"]
+            elif any(term in title_lower for term in ("eth", "ethereum")):
+                symbols = ["ETHUSDT"]
+            elif any(term in title_lower for term in ("sol", "solana")):
+                symbols = ["SOLUSDT"]
+            elif any(term in title_lower for term in ("binance", "tether", "usdt", "sec", "fed", "treasury")):
+                symbols = ["*"]
+            else:
+                symbols = []
+
+        primary_symbol = symbols[0] if symbols else ""
+        self._recent_sentiment.append((now, primary_symbol or "*", result))
 
         # Publish domain event
         if self.event_bus:
             self.event_bus.publish(NewsArticleReceivedEvent(article=article))
 
-        # Critical severity incidents trigger automatic breaking blackout
-        if result.impact == NewsImpactLevel.CRITICAL:
+        # Critical severity incidents trigger automatic breaking blackout on affected symbols only
+        if result.impact == NewsImpactLevel.CRITICAL and symbols:
             end_time = now + timedelta(minutes=self.breaking_news_blackout_minutes)
-            self._breaking_blackouts[symbol] = (article.title, end_time)
+            for sym in symbols:
+                self._breaking_blackouts[sym] = (article.title, end_time)
             logger.warning(
-                "🚨 CRITICAL BREAKING NEWS: '%s'. Engaging %dm blackout until %s",
+                "🚨 CRITICAL BREAKING NEWS: '%s'. Engaging %dm blackout for %s until %s",
                 article.title,
                 self.breaking_news_blackout_minutes,
+                symbols,
                 end_time.isoformat(),
             )
             if self.event_bus:
@@ -86,7 +102,7 @@ class NewsVolatilityShield:
                         title=article.title,
                         scheduled_at=now,
                         blackout_end=end_time,
-                        affected_symbols=[symbol],
+                        affected_symbols=symbols,
                         reason=f"Critical breaking news: {article.title}",
                     )
                 )
