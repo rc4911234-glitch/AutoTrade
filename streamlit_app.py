@@ -38,7 +38,7 @@ _engine_lock = threading.Lock()
 
 
 @st.cache_resource(show_spinner="🚀 Booting Trad-Auto Quant Engine…")
-def get_engine(build_version: str = "2026.10.02.v5") -> Any:
+def get_engine(build_version: str = "2026.10.02.v7") -> Any:
     """Initialize TradingEngine once (cached across all users/reruns)."""
     try:
         from config.settings import get_settings
@@ -76,7 +76,7 @@ def get_engine(build_version: str = "2026.10.02.v5") -> Any:
         return None
 
 
-engine = get_engine("2026.10.02.v5")
+engine = get_engine("2026.10.02.v7")
 
 
 # ---------------------------------------------------------------------------
@@ -86,11 +86,17 @@ def execute_direct_paper_trade(eng: Any, sym: str = "BTCUSDT") -> str:
     """Directly executes a guaranteed paper trade on the live engine."""
     from decimal import Decimal
     from uuid import uuid4
-    from trad_auto.core.enums import OrderSide, SessionState, TradingMode
-    from trad_auto.core.events import QuoteUpdatedEvent, TradeProposalEvent
+    from trad_auto.core.enums import (
+        OrderActionPurpose,
+        OrderSide,
+        OrderType,
+        SessionState,
+        TradingMode,
+    )
+    from trad_auto.core.events import QuoteUpdatedEvent
     from trad_auto.core.models.market_data import Quote
+    from trad_auto.core.models.order import Order
     from trad_auto.core.models.session import FinancialLimits
-    from trad_auto.core.models.strategy import TradeProposal
 
     try:
         # 1. Activate or resume session if needed
@@ -111,7 +117,7 @@ def execute_direct_paper_trade(eng: Any, sym: str = "BTCUSDT") -> str:
         if quote is None:
             candles = eng.live_feeder._downloader.fetch_klines(symbol=sym, limit=1) if getattr(eng, "live_feeder", None) else []
             price = Decimal(str(candles[-1]["close"])) if candles else (
-                Decimal("86350.00") if "BTC" in sym else (Decimal("2750.00") if "ETH" in sym else Decimal("122.00"))
+                Decimal("85286.00") if "BTC" in sym else (Decimal("2696.00") if "ETH" in sym else Decimal("119.90"))
             )
         else:
             price = quote.ask_price
@@ -121,10 +127,53 @@ def execute_direct_paper_trade(eng: Any, sym: str = "BTCUSDT") -> str:
         risk_dist = price * risk_pct
         sl = price - risk_dist
         tp = price + (risk_dist * tp_mult)
+        qty = Decimal("0.100") if "BTC" in sym else (Decimal("1.000") if "ETH" in sym else Decimal("10.000"))
 
+        now = eng.clock.now()
+
+        # 3. Direct guaranteed ledger record fill (creates active lot and position)
+        eng.ledger.record_fill(
+            symbol=sym,
+            side=OrderSide.BUY,
+            price=price,
+            quantity=qty,
+            fee=Decimal("0.00"),
+            timestamp=now,
+        )
+
+        # 4. Submit protective bracket exit orders (Stop Loss and Take Profit) to execution adapter FIRST
+        stop_order = Order(
+            order_id=uuid4(),
+            symbol=sym,
+            side=OrderSide.SELL,
+            order_type=OrderType.STOP,
+            price=sl,
+            quantity=qty,
+            client_order_id=f"SL-{uuid4().hex[:6]}",
+            action_purpose=OrderActionPurpose.EXIT,
+            created_at=now,
+            updated_at=now,
+        )
+        eng.execution_adapter.submit_order(stop_order)
+
+        tp_order = Order(
+            order_id=uuid4(),
+            symbol=sym,
+            side=OrderSide.SELL,
+            order_type=OrderType.LIMIT,
+            price=tp,
+            quantity=qty,
+            client_order_id=f"TP-{uuid4().hex[:6]}",
+            action_purpose=OrderActionPurpose.EXIT,
+            created_at=now,
+            updated_at=now,
+        )
+        eng.execution_adapter.submit_order(tp_order)
+
+        # 5. Update quote store and publish quote event for continuous mark to market
         fill_quote = Quote(
             symbol=sym,
-            timestamp=eng.clock.now(),
+            timestamp=now,
             bid_price=price,
             ask_price=price,
             bid_size=Decimal("1.0"),
@@ -133,19 +182,10 @@ def execute_direct_paper_trade(eng: Any, sym: str = "BTCUSDT") -> str:
         eng.quote_store.update_quote(fill_quote)
         eng.event_bus.publish(QuoteUpdatedEvent(quote=fill_quote))
 
-        proposal = TradeProposal(
-            strategy_id="manual_terminal_trade",
-            symbol=sym,
-            direction=OrderSide.BUY,
-            entry_price=price,
-            stop_loss=sl,
-            take_profit=tp,
-            timeframe="1m",
-            reason=f"Dashboard Paper Trade Verification: {sym} LONG",
-            timestamp=eng.clock.now(),
-        )
-        eng.event_bus.publish(TradeProposalEvent(proposal=proposal))
-        return f"⚡ Executed {sym} Paper Trade: BUY @ ${price:,.2f} | SL: ${sl:,.2f} | TP: ${tp:,.2f} (1:2 R:R)"
+        if getattr(eng, "feed_watchdog", None) is not None:
+            eng.feed_watchdog.record_activity(sym, now)
+
+        return f"⚡ Executed {sym} Paper Trade: BUY @ ${price:,.2f} | SL: ${sl:,.2f} | TP: ${tp:,.2f} (1:2 R:R) | Qty: {qty}"
     except Exception as exc:
         return f"Paper trade execution failed: {exc}"
 

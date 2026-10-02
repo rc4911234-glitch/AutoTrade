@@ -35,6 +35,18 @@ class FeedWatchdog:
         self._last_heartbeats: dict[str, datetime] = {}
         self._statuses: dict[str, DataFeedStatus] = {}
 
+        if self._event_bus is not None:
+            from trad_auto.core.events import BarCompletedEvent, QuoteUpdatedEvent
+
+            self._event_bus.subscribe(
+                QuoteUpdatedEvent,
+                lambda e: self.record_activity(e.quote.symbol, e.quote.timestamp),
+            )
+            self._event_bus.subscribe(
+                BarCompletedEvent,
+                lambda e: self.record_activity(e.bar.symbol, e.bar.timestamp),
+            )
+
     @property
     def tracked_symbols(self) -> set[str]:
         """Returns the set of actively monitored symbols."""

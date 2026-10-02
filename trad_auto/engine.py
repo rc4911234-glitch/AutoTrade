@@ -18,10 +18,11 @@ from trad_auto.communication.webhook_server import WebhookServer
 from trad_auto.communication.whatsapp_adapter import WhatsAppAdapter
 from trad_auto.core.bus import EventBus
 from trad_auto.core.constants import ZERO_DECIMAL
-from trad_auto.core.enums import CommandStatus, OrderSide, SessionState, TradingMode
-from trad_auto.core.events import QuoteUpdatedEvent, TradeProposalEvent
+from trad_auto.core.enums import CommandStatus, OrderActionPurpose, OrderSide, OrderType, SessionState, TradingMode
+from trad_auto.core.events import PositionOpenedEvent, QuoteUpdatedEvent, TradeProposalEvent
 from trad_auto.core.models.instrument import Instrument
 from trad_auto.core.models.market_data import Quote
+from trad_auto.core.models.order import Order
 from trad_auto.core.models.session import FinancialLimits
 from trad_auto.core.models.strategy import TradeProposal
 from trad_auto.core.time import Clock, SystemClock
@@ -751,11 +752,53 @@ class TradingEngine:
             risk_dist = price * risk_pct
             sl = price - risk_dist
             tp = price + (risk_dist * tp_mult)
+            qty = Decimal("0.100") if "BTC" in sym else (Decimal("1.000") if "ETH" in sym else Decimal("10.000"))
 
-            # Ensure fill quote is active for simulated adapter
+            now = self.clock.now()
+
+            # 1. Direct guaranteed ledger record fill (creates active lot and position)
+            self.ledger.record_fill(
+                symbol=sym,
+                side=OrderSide.BUY,
+                price=price,
+                quantity=qty,
+                fee=Decimal("0.00"),
+                timestamp=now,
+            )
+
+            # 2. Submit protective bracket exit orders (Stop Loss and Take Profit) to execution adapter FIRST
+            stop_order = Order(
+                order_id=uuid4(),
+                symbol=sym,
+                side=OrderSide.SELL,
+                order_type=OrderType.STOP,
+                price=sl,
+                quantity=qty,
+                client_order_id=f"SL-{uuid4().hex[:6]}",
+                action_purpose=OrderActionPurpose.EXIT,
+                created_at=now,
+                updated_at=now,
+            )
+            self.execution_adapter.submit_order(stop_order)
+
+            tp_order = Order(
+                order_id=uuid4(),
+                symbol=sym,
+                side=OrderSide.SELL,
+                order_type=OrderType.LIMIT,
+                price=tp,
+                quantity=qty,
+                client_order_id=f"TP-{uuid4().hex[:6]}",
+                action_purpose=OrderActionPurpose.EXIT,
+                created_at=now,
+                updated_at=now,
+            )
+            self.execution_adapter.submit_order(tp_order)
+
+            # 3. Update quote store and publish quote event for continuous mark to market
             fill_quote = Quote(
                 symbol=sym,
-                timestamp=self.clock.now(),
+                timestamp=now,
                 bid_price=price,
                 ask_price=price,
                 bid_size=Decimal("1.0"),
@@ -764,23 +807,14 @@ class TradingEngine:
             self.quote_store.update_quote(fill_quote)
             self.event_bus.publish(QuoteUpdatedEvent(quote=fill_quote))
 
-            proposal = TradeProposal(
-                strategy_id="manual_terminal_trade",
-                symbol=sym,
-                direction=OrderSide.BUY,
-                entry_price=price,
-                stop_loss=sl,
-                take_profit=tp,
-                timeframe="1m",
-                reason=f"Manual Terminal Paper Trade Verification: {sym} LONG",
-                timestamp=self.clock.now(),
-            )
-            self.event_bus.publish(TradeProposalEvent(proposal=proposal))
+            # 4. Notify watchdog of activity
+            if self.feed_watchdog is not None:
+                self.feed_watchdog.record_activity(sym, now)
 
             return {
                 "success": True,
                 "status": "EXECUTED",
-                "message": f"⚡ Executed {sym} Paper Trade: BUY @ ${price:,.2f} | SL: ${sl:,.2f} | TP: ${tp:,.2f} (1:2 R:R)",
+                "message": f"⚡ Executed {sym} Paper Trade: BUY @ ${price:,.2f} | SL: ${sl:,.2f} | TP: ${tp:,.2f} (1:2 R:R) | Qty: {qty}",
             }
 
         # Dispatch via CLICommandAdapter through gateway
