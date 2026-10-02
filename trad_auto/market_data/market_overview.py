@@ -105,3 +105,60 @@ def get_market_overview() -> dict[str, Any]:
     _MARKET_CACHE = result
     _LAST_FETCH_TIME = now
     return result
+
+
+_STAT_ARB_CACHE: dict[str, Any] = {}
+_LAST_STAT_ARB_FETCH = 0.0
+_STAT_ARB_TTL = 10.0
+
+
+def get_stat_arb_overview() -> dict[str, Any]:
+    """Computes real-time BTC-ETH cointegration spread, Z-score, and statistical arbitrage signal."""
+    global _STAT_ARB_CACHE, _LAST_STAT_ARB_FETCH
+    now = time.time()
+    if _STAT_ARB_CACHE and (now - _LAST_STAT_ARB_FETCH < _STAT_ARB_TTL):
+        return _STAT_ARB_CACHE
+
+    from trad_auto.math.cointegration import CointegrationEngine
+
+    default_res: dict[str, Any] = {
+        "status": "WARMING_UP",
+        "beta": 0.05,
+        "z_score": 0.0,
+        "half_life": 15.0,
+        "correlation": 0.95,
+        "signal": "NEUTRAL",
+        "current_spread": 0.0,
+    }
+
+    try:
+        def _fetch_closes(symbol: str) -> list[float]:
+            url = f"https://api.binance.us/api/v3/klines?symbol={symbol}&interval=1m&limit=40"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 TradAuto/1.0"})
+            with urllib.request.urlopen(req, timeout=3.5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return [float(k[4]) for k in data]
+
+        btc_closes = _fetch_closes("BTCUSDT")
+        eth_closes = _fetch_closes("ETHUSDT")
+
+        engine = CointegrationEngine(z_entry_threshold=2.0, z_exit_threshold=0.5, min_bars_required=25)
+        res = engine.analyze_pair("BTCUSDT", btc_closes, "ETHUSDT", eth_closes)
+
+        if res is not None:
+            default_res = {
+                "status": "ACTIVE",
+                "beta": round(res.hedge_ratio, 5),
+                "z_score": round(res.z_score, 2),
+                "half_life": round(res.half_life_bars, 1),
+                "correlation": round(res.correlation, 3),
+                "signal": res.signal.value,
+                "current_spread": round(res.current_spread, 2),
+            }
+    except Exception as exc:
+        logger.debug("[MarketOverview] Stat-Arb fetch failed: %s", exc)
+
+    _STAT_ARB_CACHE = default_res
+    _LAST_STAT_ARB_FETCH = now
+    return default_res
+

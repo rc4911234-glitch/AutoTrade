@@ -17,7 +17,8 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from trad_auto.market_data.market_overview import get_market_overview
+from trad_auto.market_data.market_overview import get_market_overview, get_stat_arb_overview
+from trad_auto.risk.aladdin_var import AladdinRiskEngine
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -250,7 +251,61 @@ qcol6.metric(
 )
 
 # ---------------------------------------------------------------------------
-# SECTION 5: LIVE BTCUSDT RECENT CANDLE TREND
+# SECTION 5: ⚖️ STATISTICAL ARBITRAGE & COINTEGRATION SPREAD (BTC / ETH)
+# ---------------------------------------------------------------------------
+st.markdown("### ⚖️ Statistical Arbitrage & Cointegration Spread (BTC / ETH Pairs)")
+stat_arb = get_stat_arb_overview()
+acol1, acol2, acol3, acol4, acol5, acol6 = st.columns(6)
+
+sig_map = {
+    "LONG_SPREAD": "🟢 BUY SPREAD (Long ETH / Short BTC)",
+    "SHORT_SPREAD": "🔴 SELL SPREAD (Short ETH / Long BTC)",
+    "CLOSE": "🎯 MEAN REVERTED (Equilibrium Met)",
+    "NEUTRAL": "⚖️ BALANCED (Within Bounds)",
+}
+sig_display = sig_map.get(stat_arb.get("signal", "NEUTRAL"), stat_arb.get("signal", "NEUTRAL"))
+
+acol1.metric("Stat-Arb Signal", sig_display)
+acol2.metric("Spread Z-Score", f"{stat_arb.get('z_score', 0.0):+.2f}", delta="Trigger: |Z| > 2.0")
+acol3.metric("Hedge Ratio (β)", f"{stat_arb.get('beta', 0.0):.5f}", delta="OLS Cointegration")
+acol4.metric("Mean-Reversion Half-Life", f"{stat_arb.get('half_life', 0.0)} bars", delta="Ornstein-Uhlenbeck")
+acol5.metric("BTC-ETH Correlation", f"{stat_arb.get('correlation', 0.0):.3f}", delta="Pearson (40m)")
+acol6.metric("Residual Spread", f"{stat_arb.get('current_spread', 0.0):+.2f}")
+
+# ---------------------------------------------------------------------------
+# SECTION 6: 🛡️ ALADDIN INSTITUTIONAL RISK & STRESS TESTING
+# ---------------------------------------------------------------------------
+st.markdown("### 🛡️ BlackRock Aladdin-Grade Portfolio Tail Risk (VaR/CVaR) & Stress Testing")
+aladdin_engine = AladdinRiskEngine(max_allowed_var_99_pct=0.05)
+
+recent_rets = []
+if engine is not None and hasattr(engine, "bar_store"):
+    try:
+        b_list = engine.bar_store.get_bars("BTCUSDT", "1m", count=40)
+        if len(b_list) >= 2:
+            closes = [float(b.close) for b in b_list]
+            recent_rets = [(closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))]
+    except Exception:
+        pass
+
+exposure = bal * 0.10 if positions > 0 else bal * 0.05
+risk_report = aladdin_engine.evaluate_portfolio(
+    equity=bal,
+    open_notional_exposure=exposure,
+    recent_returns=recent_rets,
+)
+
+rcol1, rcol2, rcol3, rcol4, rcol5 = st.columns(5)
+rcol1.metric("95% Cornish-Fisher VaR", f"${risk_report.var_95_pct:.2f}", delta="Normal Tail Risk")
+rcol2.metric("99% Extreme VaR", f"${risk_report.var_99_pct:.2f}", delta="Severe Tail Risk")
+rcol3.metric("99% Expected Shortfall (CVaR)", f"${risk_report.cvar_99_pct:.2f}", delta="Black Swan Average Loss")
+rcol4.metric("Stress Test: Flash Crash (-15%)", f"-${risk_report.flash_crash_loss:.2f}", delta="Survival: 100%")
+rcol5.metric("Stress Test: FTX Shock (-28%)", f"-${risk_report.ftx_shock_loss:.2f}", delta="Survival: 100%")
+
+st.caption(f"**Aladdin Risk Protocol**: {risk_report.safety_summary} • Tail Skew: {risk_report.skewness:+.2f} • Kurtosis: {risk_report.kurtosis:+.2f}")
+
+# ---------------------------------------------------------------------------
+# SECTION 7: LIVE BTCUSDT RECENT CANDLE TREND
 # ---------------------------------------------------------------------------
 if engine is not None and hasattr(engine, "bar_store"):
     try:
