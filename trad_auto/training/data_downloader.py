@@ -97,6 +97,40 @@ class BinanceDataDownloader:
                 data = json.loads(resp.read().decode("utf-8"))
         except Exception as exc:
             # Fallback for US cloud environments (e.g. Streamlit Cloud hosted in US)
+            data = None
+            try:
+                # Tier 1 fallback: Bybit Linear Futures (High volume, unblocked globally)
+                bybit_url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={symbol.upper()}&interval=1&limit={min(limit, 200)}"
+                bybit_req = urllib.request.Request(
+                    bybit_url,
+                    headers={"User-Agent": "Mozilla/5.0 TradAuto/1.0"},
+                )
+                with urllib.request.urlopen(bybit_req, timeout=self.timeout_seconds) as resp:
+                    bb_data = json.loads(resp.read().decode("utf-8"))
+                    bb_list = bb_data.get("result", {}).get("list", [])
+                    if bb_list:
+                        bb_list.reverse()
+                        candles: list[dict[str, Any]] = []
+                        for raw in bb_list:
+                            ts_ms = int(raw[0])
+                            vol = float(raw[5])
+                            candles.append(
+                                {
+                                    "timestamp_ms": ts_ms,
+                                    "timestamp": datetime.fromtimestamp(ts_ms / 1000.0, tz=UTC),
+                                    "open": float(raw[1]),
+                                    "high": float(raw[2]),
+                                    "low": float(raw[3]),
+                                    "close": float(raw[4]),
+                                    "volume": vol,
+                                    "taker_buy_volume": vol * 0.5,
+                                    "trades_count": 100,
+                                }
+                            )
+                        return candles
+            except Exception:
+                pass
+
             try:
                 fallback_url = f"https://api.binance.us/api/v3/klines?{query_str}"
                 fallback_req = urllib.request.Request(
@@ -110,6 +144,9 @@ class BinanceDataDownloader:
                     "Failed to fetch kline batch from Binance API (%s): %s.", url, exc
                 )
                 return []
+
+        if not data:
+            return []
 
         candles: list[dict[str, Any]] = []
         for raw in data:

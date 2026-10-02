@@ -7,6 +7,7 @@ real-time Binance institutional Whale / Smart Money alignment.
 
 from decimal import Decimal
 from typing import Any
+import numpy as np
 
 from trad_auto.ai.qlib_alpha import QlibAlphaEngine, QlibAlphaSnapshot
 from trad_auto.ai.smart_money import BinanceSmartMoneyAnalyzer
@@ -50,20 +51,20 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         atr_period: int = 14,
         atr_multiplier: Decimal = Decimal("1.5"),
         rr_target_multiplier: Decimal = Decimal("2.0"),
-        volume_multiplier: Decimal = Decimal("1.1"),
-        rsi_long_lower: Decimal = Decimal("50.0"),
+        volume_multiplier: Decimal = Decimal("0.80"),
+        rsi_long_lower: Decimal = Decimal("48.0"),
         rsi_long_upper: Decimal = Decimal("75.0"),
         rsi_short_lower: Decimal = Decimal("25.0"),
-        rsi_short_upper: Decimal = Decimal("50.0"),
+        rsi_short_upper: Decimal = Decimal("52.0"),
         smart_money_analyzer: BinanceSmartMoneyAnalyzer | None = None,
         qlib_alpha_engine: QlibAlphaEngine | None = None,
         enable_qlib_alpha: bool = True,
-        qlib_min_conviction: Decimal = Decimal("0.30"),
+        qlib_min_conviction: Decimal = Decimal("0.10"),
         adx_period: int = 14,
-        adx_threshold: Decimal = Decimal("22.0"),
+        adx_threshold: Decimal = Decimal("18.0"),
         enable_adx_filter: bool = True,
         enable_ml_filter: bool = True,
-        ml_min_probability: float = 0.60,
+        ml_min_probability: float = 0.52,
     ) -> None:
         target_symbols = symbols or ["BTCUSDT"]
         target_timeframes = timeframes or ["1m", "5m"]
@@ -219,13 +220,16 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         ):
             return []
 
-        # 1. Volume confirmation: current bar volume must exceed average
-        if bar.volume < (vol_avg * self.volume_multiplier):
-            return []
-
         risk_distance = atr_val * self.atr_multiplier
         if risk_distance <= ZERO_DECIMAL:
             return []
+
+        # 1. Volume confirmation: allow continuation if volume is adequate or if momentum is accelerating
+        if vol_avg is not None and vol_avg > ZERO_DECIMAL:
+            if bar.volume < (vol_avg * self.volume_multiplier):
+                # If price is within tight noise of trend EMA, require volume confirmation
+                if abs(bar.close - trend_val) < risk_distance:
+                    return []
 
         # 2. Qlib Alpha Microstructure Check
         qlib_snapshot: QlibAlphaSnapshot | None = None
@@ -243,7 +247,9 @@ class SmartMoneyScalperStrategy(BaseStrategy):
             if self._last_regime.regime == MarketRegimeType.HIGH_VOLATILITY_CHAOS:
                 return []
             if self._last_regime.regime == MarketRegimeType.CHOP_SIDEWAYS and self.enable_adx_filter:
-                return []
+                # If ADX has risen into trend territory (>=18), allow breakout entry
+                if not (adx.is_ready and adx.value is not None and adx.value >= self.adx_threshold):
+                    return []
 
             closes_arr = np.array([float(b.close) for b in regime_bars], dtype=np.float64)
             self._last_frac_diff_val = float(self._frac_diff.transform(closes_arr)[-1])

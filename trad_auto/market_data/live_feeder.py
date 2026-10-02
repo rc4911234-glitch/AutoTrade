@@ -43,7 +43,7 @@ class BinanceLiveFeeder:
         self._thread: threading.Thread | None = None
         self._last_completed_timestamp_ms: int = 0
 
-    def start(self, warmup_bars: int = 60) -> None:
+    def start(self, warmup_bars: int = 100) -> None:
         """Warms up indicators and launches continuous polling thread."""
         if self._running:
             return
