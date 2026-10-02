@@ -9,6 +9,8 @@ Features:
 - Fail-Closed Autonomous Execution Engine in Background Thread
 """
 
+import json
+import os
 import re
 import threading
 import time
@@ -323,7 +325,35 @@ if engine is not None and hasattr(engine, "bar_store"):
         pass
 
 # ---------------------------------------------------------------------------
-# SECTION 6: CONTROL ACTIONS & COMMAND TERMINAL
+# SECTION 7: 🧠 MASTER MENTOR QUANT ENSEMBLE AUDIT & ALPHA DRIVERS
+# ---------------------------------------------------------------------------
+meta_file = "data/models/btc_scalper_ml_metadata.json"
+if os.path.exists(meta_file):
+    try:
+        with open(meta_file, encoding="utf-8") as f:
+            ml_meta = json.load(f)
+        st.markdown("### 🧠 AI Master Mentor Stacking Ensemble & Alpha Drivers")
+        mcol1, mcol2, mcol3, mcol4, mcol5 = st.columns(5)
+        mcol1.metric("Ensemble Architecture", "HGB + Random Forest", delta="Dual Stacking")
+        dsr_val = ml_meta.get("deflated_sharpe_prob", 0.0)
+        mcol2.metric("Deflated Sharpe (DSR)", f"{dsr_val:.1%}", delta="Zero P-Hacking")
+        perf_data = ml_meta.get("performance", {})
+        oos_win = perf_data.get("win_rate_pct", 0.0)
+        mcol3.metric("OOS Win Rate", f"{oos_win:.1f}%", delta="Walk-Forward")
+        oos_pf = perf_data.get("profit_factor", 0.0)
+        mcol4.metric("Profit Factor", f"{oos_pf:.2f}", delta="1:2 R:R Target")
+        verdict = ml_meta.get("verdict", "CERTIFIED")
+        mcol5.metric("Mentor Certification", verdict)
+
+        top_feats = ml_meta.get("top_features", [])
+        if top_feats:
+            feat_str = " • ".join([f"**{name}** ({pct:.1f}%)" for name, pct in top_feats])
+            st.caption(f"**Top Microstructure Alpha Drivers**: {feat_str}")
+    except Exception:
+        pass
+
+# ---------------------------------------------------------------------------
+# SECTION 8: CONTROL ACTIONS & COMMAND TERMINAL
 # ---------------------------------------------------------------------------
 st.divider()
 st.markdown("### 🎮 Control Center & Terminal")

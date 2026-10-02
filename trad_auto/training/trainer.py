@@ -80,15 +80,10 @@ class QuantModelTrainer:
             performance.max_drawdown_pct,
         )
 
-        # 5. Train Production Classifier
-        logger.info("Training production HistGradientBoostingClassifier...")
-        model = HistGradientBoostingClassifier(
-            max_iter=100,
-            max_depth=6,
-            learning_rate=0.03,
-            min_samples_leaf=20,
-            random_state=42,
-        )
+        # 5. Train Production Stacking Ensemble (HGB + Random Forest)
+        logger.info("Training production QuantStackingEnsemble (HGB + Random Forest)...")
+        from trad_auto.training.ensemble_trainer import QuantStackingEnsemble
+        model = QuantStackingEnsemble(random_state=42)
         model.fit(X, y)
 
         # 6. Serialize Model and Metadata Artifacts
