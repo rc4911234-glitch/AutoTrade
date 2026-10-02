@@ -11,7 +11,7 @@ from typing import Any
 from trad_auto.ai.qlib_alpha import QlibAlphaEngine, QlibAlphaSnapshot
 from trad_auto.ai.smart_money import BinanceSmartMoneyAnalyzer
 from trad_auto.core.constants import ZERO_DECIMAL
-from trad_auto.core.enums import OrderSide
+from trad_auto.core.enums import MarketRegimeType, OrderSide
 from trad_auto.core.exceptions import DomainValidationError
 from trad_auto.core.models.market_data import Bar
 from trad_auto.core.models.strategy import TradeProposal
@@ -19,6 +19,7 @@ from trad_auto.indicators.adx import ADX
 from trad_auto.indicators.atr import ATR
 from trad_auto.indicators.moving_averages import EMA, SMA
 from trad_auto.indicators.rsi import RSI
+from trad_auto.market_data.regime import MarketRegimeDetector, RegimeClassification
 from trad_auto.market_data.store import BarStore
 from trad_auto.strategies.base import BaseStrategy
 
@@ -96,6 +97,10 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         self._ml_metadata: dict[str, Any] | None = None
         self._feature_extractor: Any = None
         self._last_ml_probability: float | None = None
+
+        # Statistical Market Regime Detector (GMM / Hidden Markov)
+        self._regime_detector = MarketRegimeDetector(min_bars_required=30)
+        self._last_regime: RegimeClassification | None = None
 
         if self.enable_ml_filter:
             self._load_ml_model()
@@ -226,7 +231,16 @@ class SmartMoneyScalperStrategy(BaseStrategy):
             if len(recent_bars) >= self.qlib_alpha_engine.lookback_bars:
                 qlib_snapshot = self.qlib_alpha_engine.calculate_alpha(recent_bars)
 
-        # 3. ADX Regime Filter: Ensure market is not in flat sideways chop
+        # 3. Statistical Market Regime Classification (GMM / Hidden Markov)
+        regime_bars = store.get_bars(bar.symbol, bar.timeframe, count=60)
+        if len(regime_bars) >= 30:
+            self._last_regime = self._regime_detector.classify(regime_bars)
+            if self._last_regime.regime == MarketRegimeType.HIGH_VOLATILITY_CHAOS:
+                return []
+            if self._last_regime.regime == MarketRegimeType.CHOP_SIDEWAYS and self.enable_adx_filter:
+                return []
+
+        # 3.1. ADX Regime Filter: Ensure market is not in flat sideways chop
         if self.enable_adx_filter and adx.is_ready and adx.value is not None:
             if adx.value < self.adx_threshold:
                 # Flat sideways chop detected: block trend scalping
@@ -441,4 +455,24 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                 else None
             ),
             "is_ml_active": self._ml_model is not None,
+            "market_regime": (
+                self._last_regime.regime.value
+                if self._last_regime is not None
+                else MarketRegimeType.UNKNOWN.value
+            ),
+            "regime_probability": (
+                f"{self._last_regime.probability:.1%}"
+                if self._last_regime is not None
+                else None
+            ),
+            "volatility_zscore": (
+                f"{self._last_regime.volatility_zscore:+.1f}"
+                if self._last_regime is not None
+                else None
+            ),
+            "regime_recommendation": (
+                self._last_regime.recommendation
+                if self._last_regime is not None
+                else "WARMING_UP"
+            ),
         }

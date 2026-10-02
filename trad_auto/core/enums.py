@@ -190,3 +190,13 @@ class NewsSourceType(StrEnum):
     CRYPTO_PANIC = "CRYPTO_PANIC"
     RSS_FEED = "RSS_FEED"
     CUSTOM = "CUSTOM"
+
+
+class MarketRegimeType(StrEnum):
+    """Statistical market state identified by Hidden Markov / Gaussian Mixture modeling."""
+
+    BULL_TREND = "BULL_TREND"
+    BEAR_TREND = "BEAR_TREND"
+    CHOP_SIDEWAYS = "CHOP_SIDEWAYS"
+    HIGH_VOLATILITY_CHAOS = "HIGH_VOLATILITY_CHAOS"
+    UNKNOWN = "UNKNOWN"

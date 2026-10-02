@@ -195,42 +195,32 @@ pcol4.metric("Unrealized P&L", f"${upnl:+.2f}", delta=f"{upnl:+.2f}")
 pcol5.metric("Open Positions", positions)
 
 # ---------------------------------------------------------------------------
-# SECTION 4: 22-FACTOR QUANT ML & INDICATOR RIBBON
+# SECTION 4: 22-FACTOR QUANT ML & STATISTICAL MARKET REGIME
 # ---------------------------------------------------------------------------
-st.markdown("### 🔬 Strategy Conviction & Quantitative Indicators")
-qcol1, qcol2, qcol3, qcol4, qcol5 = st.columns(5)
+st.markdown("### 🔬 Strategy Conviction & Statistical Market Regime (GMM)")
+qcol1, qcol2, qcol3, qcol4, qcol5, qcol6 = st.columns(6)
 
-s = data.get("strategy_info", {}).get("smart_money_scalper", {})
-r = data.get("retrain_info", {})
+regime_raw = s.get("market_regime", "UNKNOWN")
+regime_map = {
+    "BULL_TREND": "🟢 BULL TREND",
+    "BEAR_TREND": "🔴 BEAR TREND",
+    "CHOP_SIDEWAYS": "⏸ CHOP (RANGE)",
+    "HIGH_VOLATILITY_CHAOS": "🚨 CHAOS (FREEZE)",
+    "UNKNOWN": "⏳ WARMING UP",
+}
+regime_display = regime_map.get(regime_raw, regime_raw)
+regime_prob = s.get("regime_probability") or ""
+regime_val_str = f"{regime_display} {regime_prob}".strip()
 
-ml_active = s.get("is_ml_active", False)
-ml_prob = float(s.get("ml_probability") or 0) * 100 if s.get("ml_probability") else 0
-
-adx_raw = s.get("adx")
-try:
-    adx_val = float(adx_raw) if adx_raw is not None and str(adx_raw).strip() not in ("", "None") else 0.0
-except Exception:
-    adx_val = 0.0
-
-rsi_raw = s.get("rsi")
-try:
-    rsi_val = float(rsi_raw) if rsi_raw is not None and str(rsi_raw).strip() not in ("", "None") else 0.0
-except Exception:
-    rsi_val = 0.0
-
-trend_ema_raw = s.get("trend_ema")
-trend_ema_str = f"${float(trend_ema_raw):,.1f}" if trend_ema_raw and str(trend_ema_raw).strip() not in ("", "None") else "—"
-
-retrain_running = r.get("is_running", False)
-
-qcol1.metric("Quant ML Model", "✅ ACTIVE (≥55%)" if ml_active else "⏸ OFFLINE")
-qcol2.metric("Win Probability", f"{ml_prob:.1f}%" if ml_prob > 0 else "Scanning…")
-qcol3.metric(
+qcol1.metric("Market Regime", regime_val_str)
+qcol2.metric("Quant ML Model", "✅ ACTIVE (≥55%)" if ml_active else "⏸ OFFLINE")
+qcol3.metric("Win Probability", f"{ml_prob:.1f}%" if ml_prob > 0 else "Scanning…")
+qcol4.metric(
     "ADX Trend Filter",
     f"{adx_val:.1f} (" + ("Trending 🔥" if adx_val >= 22 else "Choppy ⏸") + ")" if adx_val > 0 else "Warming up…",
 )
-qcol4.metric("RSI (14)", f"{rsi_val:.1f}" if rsi_val > 0 else "—")
-qcol5.metric(
+qcol5.metric("RSI (14)", f"{rsi_val:.1f}" if rsi_val > 0 else "—")
+qcol6.metric(
     "Continuous Retrainer",
     "🔄 Running (24h)" if retrain_running else "⏸ Idle",
 )
