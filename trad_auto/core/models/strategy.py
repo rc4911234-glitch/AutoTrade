@@ -34,6 +34,7 @@ class TradeProposal:
     reason: str
     proposal_id: UUID = field(default_factory=uuid4)
     min_rrr: Decimal = field(default=MINIMUM_RISK_REWARD_RATIO)
+    confidence: Decimal | None = field(default=None)
 
     def __post_init__(self) -> None:
         if self.timestamp.tzinfo is None or self.timestamp.tzinfo != UTC:

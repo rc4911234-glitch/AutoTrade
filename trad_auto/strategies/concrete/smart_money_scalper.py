@@ -301,6 +301,11 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                         if (adx.is_ready and adx.value is not None)
                         else ""
                     )
+                    ml_conf = (
+                        Decimal(str(round(self._last_ml_probability, 4)))
+                        if self._last_ml_probability is not None
+                        else None
+                    )
                     proposals.append(
                         TradeProposal(
                             strategy_id=self.strategy_id,
@@ -311,6 +316,7 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                             stop_loss=stop_loss,
                             take_profit=take_profit,
                             timestamp=bar.timestamp,
+                            confidence=ml_conf,
                             reason=(
                                 f"Smart Money Long Scalp: EMA9 ({fast_val:.2f}) > "
                                 f"EMA21 ({slow_val:.2f}) > EMA50 ({trend_val:.2f}), "
@@ -358,6 +364,11 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                         if (adx.is_ready and adx.value is not None)
                         else ""
                     )
+                    ml_conf = (
+                        Decimal(str(round(self._last_ml_probability, 4)))
+                        if self._last_ml_probability is not None
+                        else None
+                    )
                     proposals.append(
                         TradeProposal(
                             strategy_id=self.strategy_id,
@@ -368,6 +379,7 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                             stop_loss=stop_loss,
                             take_profit=take_profit,
                             timestamp=bar.timestamp,
+                            confidence=ml_conf,
                             reason=(
                                 f"Smart Money Short Scalp: EMA9 ({fast_val:.2f}) < "
                                 f"EMA21 ({slow_val:.2f}) < EMA50 ({trend_val:.2f}), "

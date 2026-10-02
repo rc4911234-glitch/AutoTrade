@@ -1,4 +1,4 @@
-"""Volatility-based position sizer using ATR risk distance and strict step quantization."""
+"""Volatility-based position sizer using ATR risk distance, Kelly Criterion, and step quantization."""
 
 from decimal import Decimal
 
@@ -10,14 +10,55 @@ from trad_auto.core.money import quantize_quantity_down
 
 
 class VolatilityPositionSizer:
-    """Calculates risk-adjusted position sizes based on stop-loss distance.
+    """Calculates risk-adjusted position sizes based on stop-loss distance and Kelly Criterion.
 
     Guarantees:
-    1. Cash risk on stop-out never exceeds the target risk budget.
-    2. Gross notional value never exceeds available capital.
-    3. Quantity is strictly rounded DOWN to the instrument's quantity_step.
-    4. If the sized quantity is below instrument.min_quantity, returns 0.
+    1. Kelly Criterion Dynamic Sizing: When proposal confidence (ML win probability) is supplied,
+       calculates Half-Kelly risk budget to optimize long-term geometric compounding.
+    2. Negative Expectancy Veto: If Kelly formula determines edge <= 0, size returns 0.
+    3. Cash risk on stop-out never exceeds the target or maximum risk budget.
+    4. Gross notional value never exceeds available capital.
+    5. Quantity is strictly rounded DOWN to the instrument's quantity_step.
+    6. If the sized quantity is below instrument.min_quantity, returns 0.
     """
+
+    @classmethod
+    def calculate_kelly_risk_pct(
+        cls,
+        win_probability: Decimal,
+        risk_reward_ratio: Decimal,
+        base_risk_pct: Decimal = Decimal("0.01"),
+        fractional_multiplier: Decimal = Decimal("0.5"),  # Half-Kelly for risk mitigation
+        max_risk_cap: Decimal = Decimal("0.025"),  # Hard 2.5% max risk cap
+        min_risk_floor: Decimal = Decimal("0.005"),  # 0.5% minimum risk floor
+    ) -> Decimal:
+        """Calculates optimal risk-budget percentage using Fractional Kelly Criterion.
+
+        Formula: f* = (p * (b + 1) - 1) / b
+        where:
+          p = win probability (e.g. 0.65 from ML model)
+          b = payoff ratio (risk_reward_ratio, e.g. 2.0)
+        """
+        p = win_probability
+        b = risk_reward_ratio
+        if b <= ZERO_DECIMAL or p <= ZERO_DECIMAL:
+            return ZERO_DECIMAL
+
+        # Kelly fraction: (p * (b + 1) - 1) / b
+        numerator = p * (b + Decimal("1.0")) - Decimal("1.0")
+        if numerator <= ZERO_DECIMAL:
+            # Negative expectancy: mathematical trade veto
+            return ZERO_DECIMAL
+
+        full_kelly = numerator / b
+        fractional_kelly = full_kelly * fractional_multiplier
+
+        # Scale base risk by fractional Kelly
+        dynamic_risk = base_risk_pct * (Decimal("1.0") + fractional_kelly)
+
+        # Enforce institutional boundaries [min_risk_floor, max_risk_cap]
+        clamped_risk = max(min_risk_floor, min(dynamic_risk, max_risk_cap))
+        return clamped_risk
 
     @classmethod
     def calculate_quantity(
@@ -39,8 +80,19 @@ class VolatilityPositionSizer:
         if risk_per_unit <= ZERO_DECIMAL:
             raise DomainValidationError("Proposal risk_amount_per_unit must be strictly positive")
 
-        # 1. Determine cash risk budget
-        cash_risk_budget = available_capital * risk_pct_per_trade
+        # 1. Determine cash risk budget (Kelly-adjusted if confidence is provided)
+        effective_risk_pct = risk_pct_per_trade
+        if proposal.confidence is not None and proposal.confidence > ZERO_DECIMAL:
+            effective_risk_pct = cls.calculate_kelly_risk_pct(
+                win_probability=proposal.confidence,
+                risk_reward_ratio=proposal.risk_reward_ratio,
+                base_risk_pct=risk_pct_per_trade,
+            )
+            if effective_risk_pct <= ZERO_DECIMAL:
+                # Mathematical veto by Kelly Criterion
+                return ZERO_DECIMAL
+
+        cash_risk_budget = available_capital * effective_risk_pct
         if max_risk_amount is not None and max_risk_amount > ZERO_DECIMAL:
             cash_risk_budget = min(cash_risk_budget, max_risk_amount)
 
