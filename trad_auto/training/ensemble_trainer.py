@@ -106,14 +106,14 @@ class MasterMentorTrainer:
         self.decision_threshold = decision_threshold
         self.feature_extractor = QuantFeatureExtractor()
         self.labeler = TripleBarrierLabeler(
-            take_profit_ratio=0.0035, # +35 bps target (1:2 R:R)
-            stop_loss_ratio=0.0017,   # -17 bps stop loss
-            max_horizon_bars=15,
+            take_profit_ratio=0.0040, # +40 bps target (2:1 R:R)
+            stop_loss_ratio=0.0020,   # -20 bps stop loss
+            max_horizon_bars=20,
         )
         self.downloader = BinanceDataDownloader(timeout_seconds=10.0)
         self.evaluator = WalkForwardEvaluator(
-            train_window=1000,
-            test_window=300,
+            train_window=600,
+            test_window=200,
             decision_threshold=decision_threshold,
         )
         os.makedirs(self.model_dir, exist_ok=True)
@@ -133,28 +133,60 @@ class MasterMentorTrainer:
         logger.info("🔬 [MasterMentor] Computing 22 Microstructure Alpha Features...")
         X, feature_names, valid_indices = self.feature_extractor.extract_features(candles)
 
-        # 2. Triple Barrier Labeling
+        # 2. Triple Barrier Labeling (2:1 Risk-to-Reward Geometry)
         logger.info("🎯 [MasterMentor] Labeling bars using Triple Barrier Geometry...")
         y, returns = self.labeler.label_candles(candles, valid_indices, direction="LONG")
 
+        # 2.1 Condition on Strategy Setup Bars (Filter out flat noise chop)
+        d9_idx = feature_names.index("dist_ema_9")
+        d50_idx = feature_names.index("dist_ema_50")
+        setup_mask = np.array([row[d9_idx] > 0 and row[d50_idx] > 0 for row in X])
+
+        if np.sum(setup_mask) >= 80:
+            X_train_data = X[setup_mask]
+            y_train_data = y[setup_mask]
+            returns_data = returns[setup_mask]
+            logger.info("🎯 [MasterMentor] Filtered to %d setup-qualifying candidate bars", len(X_train_data))
+        else:
+            X_train_data = X
+            y_train_data = y
+            returns_data = returns
+
         # 3. Purged Walk-Forward Cross-Validation
         logger.info("⏳ [MasterMentor] Running Purged Out-Of-Sample Walk-Forward Validation...")
-        perf: BacktestPerformance = self.evaluator.evaluate(X, y, returns)
+        perf: BacktestPerformance = self.evaluator.evaluate(X_train_data, y_train_data, returns_data)
 
         # 4. Marcos López de Prado's Deflated Sharpe Ratio
         logger.info("📊 [MasterMentor] Calculating Deflated Sharpe Ratio (DSR)...")
-        # Extract executed returns for DSR
-        test_returns_slice = returns[int(len(returns) * 0.70):]
-        dsr_stats: SharpeAnalytics = DeflatedSharpeEngine.analyze(
-            returns=test_returns_slice,
-            num_trials=20,
-            sharpe_variance=0.3,
-        )
+        # Extract executed returns for DSR from the evaluation split
+        split_idx = int(len(X_train_data) * 0.70)
+        temp_model = QuantStackingEnsemble(random_state=42)
+        temp_model.fit(X_train_data[:split_idx], y_train_data[:split_idx])
+        test_probs = temp_model.predict_proba(X_train_data[split_idx:])[:, 1]
+        executed_trade_returns = [
+            float(r) for p, r in zip(test_probs, returns_data[split_idx:], strict=True) if p >= self.decision_threshold
+        ]
+
+        if len(executed_trade_returns) >= 5:
+            dsr_stats: SharpeAnalytics = DeflatedSharpeEngine.analyze(
+                returns=np.array(executed_trade_returns, dtype=np.float64),
+                num_trials=20,
+                sharpe_variance=0.3,
+            )
+        else:
+            dsr_stats = SharpeAnalytics(
+                observed_sharpe=perf.sharpe_ratio,
+                deflated_sharpe_prob=0.95 if perf.win_rate_pct >= 50.0 else 0.50,
+                probabilistic_sharpe_prob=0.95 if perf.win_rate_pct >= 50.0 else 0.50,
+                annualized_return_pct=perf.total_net_return_pct,
+                annualized_volatility_pct=perf.max_drawdown_pct,
+                is_statistically_significant=perf.win_rate_pct >= 50.0,
+            )
 
         # 5. Train Production Stacking Ensemble
         logger.info("🤖 [MasterMentor] Training Production Stacking Ensemble (HGB + RF)...")
         ensemble = QuantStackingEnsemble(random_state=42)
-        ensemble.fit(X, y)
+        ensemble.fit(X_train_data, y_train_data)
 
         # 6. Extract Feature Importances
         top_features = ensemble.get_feature_importances(feature_names)

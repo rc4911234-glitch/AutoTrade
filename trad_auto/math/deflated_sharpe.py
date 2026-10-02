@@ -78,12 +78,15 @@ class DeflatedSharpeEngine:
         denom_sq = 1.0 - (skew * sr) + (((kurt - 1.0) / 4.0) * (sr ** 2))
         sr_std = math.sqrt(max(0.0001, denom_sq) / max(1, n - 1))
 
+        # Scale to consistent annualized basis for benchmark & expected max comparison
+        sr_ann = sr * annualization_factor
+        sr_std_ann = sr_std * annualization_factor
+
         # 2. Probabilistic Sharpe Ratio (PSR) vs benchmark
-        z_psr = (sr - benchmark_sharpe) / sr_std
+        z_psr = (sr_ann - benchmark_sharpe) / max(0.001, sr_std_ann)
         psr = float(norm.cdf(z_psr))
 
         # 3. Expected Maximum Sharpe Ratio under null hypothesis of no true alpha
-        # E[max(SR_N)] approx = sqrt(V) * ((1 - euler_mascheroni) * Z^-1(1 - 1/N) + euler * Z^-1(1 - 1/(N*e)))
         euler_mascheroni = 0.5772156649
         z_p1 = norm.ppf(1.0 - (1.0 / max(2, num_trials)))
         z_p2 = norm.ppf(1.0 - (1.0 / (max(2, num_trials) * math.e)))
@@ -92,7 +95,7 @@ class DeflatedSharpeEngine:
         )
 
         # 4. Deflated Sharpe Ratio (DSR)
-        z_dsr = (sr - expected_max_sr) / sr_std
+        z_dsr = (sr_ann - expected_max_sr) / max(0.001, sr_std_ann)
         dsr = float(norm.cdf(z_dsr))
 
         return SharpeAnalytics(

@@ -72,7 +72,7 @@ class NewsVolatilityShield:
                 symbols = ["ETHUSDT"]
             elif any(term in title_lower for term in ("sol", "solana")):
                 symbols = ["SOLUSDT"]
-            elif any(term in title_lower for term in ("binance", "tether", "usdt", "sec", "fed", "treasury")):
+            elif any(term in title_lower for term in ("tether depeg", "usdt depeg", "binance insolv", "fed emergency", "emergency rate", "world war")):
                 symbols = ["*"]
             else:
                 symbols = []
@@ -87,25 +87,45 @@ class NewsVolatilityShield:
         # Critical severity incidents trigger automatic breaking blackout on affected symbols only
         if result.impact == NewsImpactLevel.CRITICAL and symbols:
             end_time = now + timedelta(minutes=self.breaking_news_blackout_minutes)
+            engaged_symbols: list[str] = []
             for sym in symbols:
-                self._breaking_blackouts[sym] = (article.title, end_time)
-            logger.warning(
-                "🚨 CRITICAL BREAKING NEWS: '%s'. Engaging %dm blackout for %s until %s",
-                article.title,
-                self.breaking_news_blackout_minutes,
-                symbols,
-                end_time.isoformat(),
-            )
-            if self.event_bus:
-                self.event_bus.publish(
-                    NewsShieldBlackoutEngagedEvent(
-                        title=article.title,
-                        scheduled_at=now,
-                        blackout_end=end_time,
-                        affected_symbols=symbols,
-                        reason=f"Critical breaking news: {article.title}",
+                if sym == "*":
+                    title_lower = article.title.lower()
+                    is_systemic = any(
+                        term in title_lower
+                        for term in (
+                            "tether depeg",
+                            "usdt depeg",
+                            "binance halt",
+                            "binance insolv",
+                            "emergency rate",
+                            "world war",
+                            "systemic collapse",
+                        )
                     )
+                    if not is_systemic:
+                        continue
+                self._breaking_blackouts[sym] = (article.title, end_time)
+                engaged_symbols.append(sym)
+
+            if engaged_symbols:
+                logger.warning(
+                    "🚨 CRITICAL BREAKING NEWS: '%s'. Engaging %dm blackout for %s until %s",
+                    article.title,
+                    self.breaking_news_blackout_minutes,
+                    engaged_symbols,
+                    end_time.isoformat(),
                 )
+                if self.event_bus:
+                    self.event_bus.publish(
+                        NewsShieldBlackoutEngagedEvent(
+                            title=article.title,
+                            scheduled_at=now,
+                            blackout_end=end_time,
+                            affected_symbols=engaged_symbols,
+                            reason=f"Critical breaking news: {article.title}",
+                        )
+                    )
 
         return result
 

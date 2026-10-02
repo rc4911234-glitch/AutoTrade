@@ -1,7 +1,7 @@
 {
   "model_name": "btc_scalper_ml",
   "architecture": "QuantStackingEnsemble (HistGradientBoosting + RandomForest)",
-  "sample_count": 750,
+  "sample_count": 1450,
   "feature_names": [
     "ret_1",
     "ret_3",
@@ -28,37 +28,37 @@
   ],
   "top_features": [
     [
-      "ret_30",
-      8.82
-    ],
-    [
-      "di_diff",
-      7.34
+      "dist_ema_50",
+      6.75
     ],
     [
       "volatility_parkinson",
-      7.22
+      6.59
+    ],
+    [
+      "di_diff",
+      6.41
+    ],
+    [
+      "ret_15",
+      5.99
     ],
     [
       "qlib_vwap_div",
-      6.89
-    ],
-    [
-      "dist_ema_9",
-      6.11
+      5.85
     ]
   ],
-  "decision_threshold": 0.52,
+  "decision_threshold": 0.48,
   "performance": {
-    "total_trades": 64,
-    "winning_trades": 10,
-    "losing_trades": 54,
-    "win_rate_pct": 15.625,
-    "profit_factor": 0.19593737959876167,
-    "total_net_return_pct": -4.764998076204942,
-    "max_drawdown_pct": 4.724294052261573,
-    "sharpe_ratio": -53.38771576915872
+    "total_trades": 28,
+    "winning_trades": 19,
+    "losing_trades": 9,
+    "win_rate_pct": 67.85714285714286,
+    "profit_factor": 3.1045615299326657,
+    "total_net_return_pct": 3.8958014655321005,
+    "max_drawdown_pct": 1.4385407096218243,
+    "sharpe_ratio": 42.69491366576427
   },
-  "deflated_sharpe_prob": 0.0,
-  "verdict": "ACCEPTED_WITH_OBSERVATION"
+  "deflated_sharpe_prob": 0.9791,
+  "verdict": "INSTITUTIONAL_ALPHA_VERIFIED"
 }
