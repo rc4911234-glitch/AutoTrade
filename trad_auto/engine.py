@@ -486,7 +486,7 @@ class TradingEngine:
 
         # Start real-time live data feeder & instant warmup
         if self.live_feeder is not None:
-            self.live_feeder.start(warmup_bars=60)
+            self.live_feeder.start(warmup_bars=100)
 
         self._is_running = True
         logger.info("TradingEngine started: market feeds connected and monitoring")

@@ -90,11 +90,12 @@ class BinanceLiveFeeder:
                     # Latest candle quote update
                     latest = recent[-1]
                     price = Decimal(str(latest["close"]))
+                    half_spread = max(price * Decimal("0.00005"), Decimal("0.10"))
                     quote = Quote(
                         timestamp=latest.get("timestamp") or datetime.now(tz=UTC),
                         symbol=self.symbol,
-                        bid_price=price,
-                        ask_price=price,
+                        bid_price=price - half_spread,
+                        ask_price=price + half_spread,
                         bid_size=Decimal("1.0"),
                         ask_size=Decimal("1.0"),
                     )

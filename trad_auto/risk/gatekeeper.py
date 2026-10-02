@@ -45,7 +45,7 @@ class RiskGatekeeper:
         portfolio_bridge: PortfolioRiskBridge,
         instruments: dict[str, Instrument] | None = None,
         default_risk_pct: Decimal = Decimal("0.01"),  # 1% cash risk per trade
-        order_type: OrderType = OrderType.LIMIT_MAKER,
+        order_type: OrderType = OrderType.LIMIT,
         intent_validity_seconds: int = 300,  # 5 minutes validity
         news_shield: "NewsVolatilityShield | None" = None,
         feed_watchdog: "FeedWatchdog | None" = None,

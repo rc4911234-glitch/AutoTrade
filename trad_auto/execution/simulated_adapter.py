@@ -68,9 +68,14 @@ class SimulatedExecutionAdapter(ExecutionAdapter):
         if order.order_type == OrderType.LIMIT_MAKER:
             # Post-only check: cannot cross existing top-of-book spread
             if quote is not None:
-                crosses_spread = (
-                    order.side == OrderSide.BUY and order.price >= quote.ask_price
-                ) or (order.side == OrderSide.SELL and order.price <= quote.bid_price)
+                has_spread = quote.ask_price > quote.bid_price
+                if has_spread:
+                    crosses_spread = (
+                        order.side == OrderSide.BUY and order.price > quote.ask_price
+                    ) or (order.side == OrderSide.SELL and order.price < quote.bid_price)
+                else:
+                    crosses_spread = False
+
                 if crosses_spread:
                     order.mark_rejected("Post-only order would cross spread as taker", now)
                     self._event_bus.publish(
@@ -88,8 +93,8 @@ class SimulatedExecutionAdapter(ExecutionAdapter):
         self._active_orders[order.order_id] = order
         self._event_bus.publish(OrderSubmittedEvent(order=order))
 
-        # Check if immediate fill occurs against current quote (for standard LIMIT)
-        if order.order_type == OrderType.LIMIT and quote is not None:
+        # Check if immediate fill occurs against current quote (for standard LIMIT & matching LIMIT_MAKER)
+        if order.order_type in (OrderType.LIMIT, OrderType.LIMIT_MAKER) and quote is not None:
             self._match_order_against_quote(order, quote, now)
 
     def cancel_order(self, order_id: UUID) -> bool:
