@@ -30,6 +30,7 @@ from trad_auto.health import HealthMonitor, SystemHealthReport
 from trad_auto.market_data.adapters.base import BaseMarketDataAdapter
 from trad_auto.market_data.adapters.simulated import SimulatedMarketDataAdapter
 from trad_auto.market_data.bar_builder import BarBuilder
+from trad_auto.market_data.live_feeder import BinanceLiveFeeder
 from trad_auto.market_data.store import BarStore, QuoteStore
 from trad_auto.market_data.streaming.adapter import StreamingMarketDataAdapter
 from trad_auto.market_data.streaming.binance_ws import BinanceWebSocketClient
@@ -263,6 +264,20 @@ class TradingEngine:
         if self.feed_watchdog is not None:
             self.risk_gatekeeper.set_feed_watchdog(self.feed_watchdog)
 
+        is_simulated = hasattr(self.clock, "advance")
+        self.live_feeder: BinanceLiveFeeder | None = None
+        if (
+            self.settings.trading_mode in ("LIVE", "PAPER")
+            and not is_simulated
+            and market_data_adapter is None
+        ):
+            self.live_feeder = BinanceLiveFeeder(
+                event_bus=self.event_bus,
+                symbol="BTCUSDT",
+                timeframe="1m",
+                poll_interval_sec=6.0,
+            )
+
         # 8. Communication Notifier + Webhook Server (if credentials provided or dashboard enabled)
         self.whatsapp_notifier: WhatsAppNotifier | None = None
         self.webhook_server: WebhookServer | None = None
@@ -469,6 +484,10 @@ class TradingEngine:
         if self.auto_retrainer is not None:
             self.auto_retrainer.start()
 
+        # Start real-time live data feeder & instant warmup
+        if self.live_feeder is not None:
+            self.live_feeder.start(warmup_bars=60)
+
         self._is_running = True
         logger.info("TradingEngine started: market feeds connected and monitoring")
 
@@ -495,7 +514,11 @@ class TradingEngine:
         if self.auto_retrainer is not None:
             self.auto_retrainer.stop()
 
-        # 5. Disconnect market data
+        # 5. Stop real-time live data feeder
+        if self.live_feeder is not None:
+            self.live_feeder.stop()
+
+        # 6. Disconnect market data
         self.market_data_adapter.disconnect()
 
         self._is_running = False
@@ -622,6 +645,12 @@ class TradingEngine:
                 strategy_info["smart_money_scalper"] = scalper.get_indicator_snapshot()
         except Exception as err:
             logger.debug("Failed to retrieve strategy indicators: %s", err)
+
+        last_price = None
+        q = self.quote_store.get_latest_quote("BTCUSDT")
+        if q is not None:
+            last_price = str(q.mid_price)
+        status["last_btc_price"] = last_price
 
         # 5. Machine Learning Auto-Retrainer Telemetry
         retrain_info: dict[str, Any] = {}

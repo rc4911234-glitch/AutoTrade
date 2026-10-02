@@ -106,18 +106,18 @@ class StrategyManager:
     def evaluate_bar(self, bar: Bar) -> list[TradeProposal]:
         """Evaluates all matching registered strategies on a closed Bar.
 
-        Proposals are strictly suppressed if not in TRADING state.
+        Indicators are continuously maintained. Proposals are strictly suppressed if not in TRADING state.
         """
-        if not self.is_trading_allowed():
-            return []
+        trading_allowed = self.is_trading_allowed()
 
         proposals: list[TradeProposal] = []
         for strategy in self._strategies.values():
             if strategy.handles(bar.symbol, bar.timeframe):
                 strategy_proposals = strategy.on_bar_completed(bar, self._bar_store)
-                for p in strategy_proposals:
-                    proposals.append(p)
-                    self._event_bus.publish(TradeProposalEvent(proposal=p))
+                if trading_allowed:
+                    for p in strategy_proposals:
+                        proposals.append(p)
+                        self._event_bus.publish(TradeProposalEvent(proposal=p))
 
         return proposals
 

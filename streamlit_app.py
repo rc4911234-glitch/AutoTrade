@@ -120,22 +120,40 @@ col3.metric("Today Realized P&L", f"${rpnl:+.2f}", delta=f"{rpnl:+.2f}")
 col4.metric("Unrealized P&L", f"${upnl:+.2f}", delta=f"{upnl:+.2f}")
 col5.metric("Open Positions", positions)
 
-# Row 2: ML & Strategy metrics
+# News Shield Blackout Alert Banner
+news_info = data.get("news_info", {})
+if news_info.get("is_blackout"):
+    st.warning(
+        "🛡️ **NEWS VOLATILITY SHIELD ACTIVE**: Breaking high-impact crypto news detected. "
+        "New trade entries temporarily blacked out to preserve capital."
+    )
+
+# Row 2: Live Market, ML & Strategy metrics
 st.divider()
 s = data.get("strategy_info", {}).get("smart_money_scalper", {})
 r = data.get("retrain_info", {})
 
-col6, col7, col8, col9 = st.columns(4)
+col6, col7, col8, col9, col10 = st.columns(5)
+
+btc_price = data.get("last_btc_price")
+btc_display = f"${float(btc_price):,.2f}" if btc_price else "Connecting…"
 
 ml_active = s.get("is_ml_active", False)
 ml_prob = float(s.get("ml_probability") or 0) * 100 if s.get("ml_probability") else 0
-adx_val = float(s.get("adx") or 0)
+
+adx_raw = s.get("adx")
+try:
+    adx_val = float(adx_raw) if adx_raw is not None and str(adx_raw).strip() not in ("", "None") else 0.0
+except Exception:
+    adx_val = 0.0
+
 retrain_running = r.get("is_running", False)
 
-col6.metric("Quant ML Model", "✅ ACTIVE (≥55%)" if ml_active else "⏸ OFFLINE")
-col7.metric("Win Probability", f"{ml_prob:.1f}%" if ml_prob > 0 else "Scanning…")
-col8.metric("ADX Trend Filter", f"{adx_val:.1f}" if adx_val > 0 else "—")
-col9.metric(
+col6.metric("Live BTC Price", btc_display)
+col7.metric("Quant ML Model", "✅ ACTIVE (≥55%)" if ml_active else "⏸ OFFLINE")
+col8.metric("Win Probability", f"{ml_prob:.1f}%" if ml_prob > 0 else "Scanning…")
+col9.metric("ADX Trend Filter", f"{adx_val:.1f}" if adx_val > 0 else "Warming up…")
+col10.metric(
     "Continuous Retrainer",
     "🔄 Running (24h)" if retrain_running else "⏸ Idle",
 )
