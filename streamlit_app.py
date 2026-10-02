@@ -76,7 +76,7 @@ def get_engine(build_version: str = "2026.10.02.v7") -> Any:
         return None
 
 
-engine = get_engine("2026.10.02.v7")
+engine = get_engine("2026.10.02.v8")
 
 
 # ---------------------------------------------------------------------------
@@ -492,11 +492,79 @@ if os.path.exists(meta_file):
         pass
 
 # ---------------------------------------------------------------------------
-# SECTION 8: CONTROL ACTIONS & COMMAND TERMINAL
+# SECTION 8: 🧠 PRO TRADER CONTINUOUS LEARNING BRAIN & TRADE JOURNAL DIARY
+# ---------------------------------------------------------------------------
+st.divider()
+st.markdown("### 🧠 Pro Trader Brain: Continuous Learning & Trade Journal Diary")
+st.caption("Episodic trade reflection engine modeled after institutional quantitative portfolio managers. Analyzes every trade post-mortem, attributes causality, writes empirical lessons, and dynamically tunes regime risk thresholds.")
+
+brain_data = snap.get("brain", {})
+if brain_data:
+    b_col1, b_col2, b_col3, b_col4, b_col5 = st.columns(5)
+    b_col1.metric("Today's Trades", brain_data.get("total_today_trades", 0))
+    b_col2.metric("Wins / Losses", f"{brain_data.get('wins', 0)}W / {brain_data.get('losses', 0)}L")
+    b_col3.metric("Win Rate", f"{brain_data.get('win_rate_pct', 0.0)}%")
+    pnl_val = brain_data.get("net_pnl", "0.00")
+    b_col4.metric("Realized PnL", f"${pnl_val} USDT")
+    b_col5.metric("Learning State", "ACTIVE & ADAPTING", delta="Self-Reflecting")
+
+    # Lessons Learned Today
+    st.markdown("#### 💡 Today's Lessons Learned & Trader Post-Mortems")
+    lessons = brain_data.get("recent_lessons", [])
+    if lessons:
+        for idx, l_text in enumerate(lessons, 1):
+            st.info(f"**Lesson #{idx}:** {l_text}")
+    else:
+        st.write("*(No trade post-mortems logged yet today. Taking trades will activate introspective reflections).*")
+
+    # Adaptive Regime Tuning Matrix
+    st.markdown("#### ⚙️ Adaptive Market Regime Matrix")
+    regime_list = brain_data.get("regime_matrix", [])
+    if regime_list:
+        reg_df = pd.DataFrame(regime_list)
+        reg_df.rename(
+            columns={
+                "regime": "Market Regime",
+                "total_trades": "Trades",
+                "wins": "Wins",
+                "losses": "Losses",
+                "win_rate_pct": "Win Rate %",
+                "current_ml_threshold": "Adaptive ML Hurdle",
+                "risk_multiplier": "Risk Multiplier",
+                "total_pnl": "Net PnL (USDT)",
+            },
+            inplace=True,
+        )
+        st.dataframe(reg_df, use_container_width=True, hide_index=True)
+
+    # Recent Trade Journal Entries Table
+    st.markdown("#### 📖 Recent Trade Journal Chronicle")
+    recent_entries = brain_data.get("recent_entries", [])
+    if recent_entries:
+        j_records = []
+        for e in recent_entries:
+            j_records.append({
+                "Symbol": e.get("symbol"),
+                "Side": e.get("side"),
+                "Entry": f"${float(e.get('entry_price', 0)):,.2f}",
+                "Exit": f"${float(e.get('exit_price', 0)):,.2f}" if e.get("exit_price") else "-",
+                "PnL": f"${float(e.get('realized_pnl', 0)):+.2f}",
+                "R-Mult": f"{float(e.get('r_multiple', 0)):.2f}R",
+                "Outcome": e.get("outcome"),
+                "Exit Reason": e.get("exit_reason"),
+                "Regime": e.get("entry_regime"),
+                "Post-Mortem Analysis": e.get("post_mortem_analysis"),
+            })
+        st.dataframe(pd.DataFrame(j_records), use_container_width=True, hide_index=True)
+    else:
+        st.caption("No historical trade journal entries found.")
+
+# ---------------------------------------------------------------------------
+# SECTION 9: CONTROL ACTIONS & COMMAND TERMINAL
 # ---------------------------------------------------------------------------
 st.divider()
 st.markdown("### 🎮 Control Center & Terminal")
-bcol1, bcol2, bcol3, bcol4, bcol5, bcol6 = st.columns(6)
+bcol1, bcol2, bcol3, bcol4, bcol5, bcol6, bcol7 = st.columns(7)
 
 if bcol1.button("▶ Start Paper (1000 USDT)", type="primary", use_container_width=True):
     st.info(run_cmd("start paper 1000"))
@@ -512,11 +580,16 @@ if bcol4.button("⚡ Test Paper Trade", use_container_width=True):
     st.session_state["_last_cmd_result"] = msg
     st.rerun()
 
-if bcol5.button("🔄 Retrain ML Now", use_container_width=True):
+if bcol5.button("⚡ Close Trade (Learn)", use_container_width=True):
+    msg = run_cmd("close btc")
+    st.session_state["_last_cmd_result"] = msg
+    st.rerun()
+
+if bcol6.button("🔄 Retrain ML Now", use_container_width=True):
     msg = run_cmd("retrain ml")
     st.session_state["_last_cmd_result"] = msg
 
-if bcol6.button("🚨 KILL SWITCH", type="secondary", use_container_width=True):
+if bcol7.button("🚨 KILL SWITCH", type="secondary", use_container_width=True):
     msg = run_cmd("kill")
     st.session_state["_last_cmd_result"] = msg
 

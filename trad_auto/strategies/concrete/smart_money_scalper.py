@@ -65,6 +65,7 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         enable_adx_filter: bool = True,
         enable_ml_filter: bool = True,
         ml_min_probability: float = 0.52,
+        adaptive_policy: Any = None,
     ) -> None:
         target_symbols = symbols or ["BTCUSDT"]
         target_timeframes = timeframes or ["1m", "5m"]
@@ -94,6 +95,7 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         self.enable_adx_filter = enable_adx_filter
         self.enable_ml_filter = enable_ml_filter
         self.ml_min_probability = ml_min_probability
+        self.adaptive_policy = adaptive_policy
 
         self._ml_model: Any = None
         self._ml_metadata: dict[str, Any] | None = None
@@ -280,7 +282,12 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                     X, _, _ = self._feature_extractor.extract_features(raw_candles)
                     prob = float(self._ml_model.predict_proba(X[-1:])[:, 1][0])
                     self._last_ml_probability = prob
-                    if prob < self.ml_min_probability:
+                    min_prob = self.ml_min_probability
+                    if self.adaptive_policy is not None and self._last_regime is not None:
+                        min_prob = self.adaptive_policy.get_threshold_for_regime(
+                            self._last_regime.regime.value
+                        )
+                    if prob < min_prob:
                         return []
                 except Exception:
                     pass
@@ -464,6 +471,16 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                 f"{self._last_ml_probability:.2f}"
                 if self._last_ml_probability is not None
                 else None
+            ),
+            "adaptive_ml_threshold": (
+                round(
+                    self.adaptive_policy.get_threshold_for_regime(
+                        self._last_regime.regime.value if self._last_regime else "UNKNOWN"
+                    ),
+                    2,
+                )
+                if self.adaptive_policy is not None
+                else self.ml_min_probability
             ),
             "is_ml_active": self._ml_model is not None,
             "market_regime": (
