@@ -76,7 +76,7 @@ def get_engine(build_version: str = "2026.10.02.v7") -> Any:
         return None
 
 
-engine = get_engine("2026.10.02.v8")
+engine = get_engine("2026.10.02.v9")
 
 
 # ---------------------------------------------------------------------------
@@ -498,7 +498,7 @@ st.divider()
 st.markdown("### 🧠 Pro Trader Brain: Continuous Learning & Trade Journal Diary")
 st.caption("Episodic trade reflection engine modeled after institutional quantitative portfolio managers. Analyzes every trade post-mortem, attributes causality, writes empirical lessons, and dynamically tunes regime risk thresholds.")
 
-brain_data = snap.get("brain", {})
+brain_data = data.get("brain", {})
 if brain_data:
     b_col1, b_col2, b_col3, b_col4, b_col5 = st.columns(5)
     b_col1.metric("Today's Trades", brain_data.get("total_today_trades", 0))
