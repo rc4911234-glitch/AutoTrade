@@ -273,9 +273,9 @@ class TradingEngine:
         ):
             self.live_feeder = BinanceLiveFeeder(
                 event_bus=self.event_bus,
-                symbol="BTCUSDT",
+                symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
                 timeframe="1m",
-                poll_interval_sec=6.0,
+                poll_interval_sec=5.0,
             )
 
         # 8. Communication Notifier + Webhook Server (if credentials provided or dashboard enabled)
@@ -373,6 +373,16 @@ class TradingEngine:
                 quantity_step=Decimal("0.01"),
                 min_quantity=Decimal("0.01"),
             ),
+            Instrument(
+                symbol="SOLUSDT",
+                exchange="BINANCE",
+                asset_class="CRYPTO",
+                currency="USDT",
+                tick_size=Decimal("0.01"),
+                lot_size=Decimal("0.1"),
+                quantity_step=Decimal("0.1"),
+                min_quantity=Decimal("0.1"),
+            ),
         ]
 
     def _build_default_strategies(self) -> list[BaseStrategy]:
@@ -390,7 +400,7 @@ class TradingEngine:
             ),
             SmartMoneyScalperStrategy(
                 strategy_id="smart_money_scalper",
-                symbols=["BTCUSDT"],
+                symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
                 timeframes=["1m", "5m"],
             ),
         ]
