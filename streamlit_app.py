@@ -197,7 +197,29 @@ pcol5.metric("Open Positions", positions)
 # ---------------------------------------------------------------------------
 # SECTION 4: 22-FACTOR QUANT ML & STATISTICAL MARKET REGIME
 # ---------------------------------------------------------------------------
-st.markdown("### 🔬 Strategy Conviction & Statistical Market Regime (GMM)")
+st.markdown("### 🔬 Strategy Conviction, López de Prado Memory & Market Regime")
+
+strat_info = data.get("strategy_info", {})
+s = strat_info.get("smart_money_scalper", {})
+
+ml_prob_str = s.get("ml_probability")
+ml_prob = float(ml_prob_str) * 100.0 if ml_prob_str else 0.0
+ml_active = s.get("is_ml_active", False)
+
+adx_str = s.get("adx")
+adx_val = float(adx_str) if adx_str else 0.0
+
+rsi_str = s.get("rsi")
+rsi_val = float(rsi_str) if rsi_str else 0.0
+
+frac_val = s.get("frac_diff_val") or "—"
+frac_mem = s.get("frac_diff_memory") or "d=0.40"
+
+regime_rec = s.get("regime_recommendation", "WARMING_UP")
+
+retrain_info = data.get("retrain_info", {})
+retrain_running = retrain_info.get("is_running", False)
+
 qcol1, qcol2, qcol3, qcol4, qcol5, qcol6 = st.columns(6)
 
 regime_raw = s.get("market_regime", "UNKNOWN")
@@ -212,17 +234,19 @@ regime_display = regime_map.get(regime_raw, regime_raw)
 regime_prob = s.get("regime_probability") or ""
 regime_val_str = f"{regime_display} {regime_prob}".strip()
 
-qcol1.metric("Market Regime", regime_val_str)
-qcol2.metric("Quant ML Model", "✅ ACTIVE (≥55%)" if ml_active else "⏸ OFFLINE")
-qcol3.metric("Win Probability", f"{ml_prob:.1f}%" if ml_prob > 0 else "Scanning…")
+qcol1.metric("Market Regime (GMM)", regime_val_str, delta=f"Action: {regime_rec}")
+qcol2.metric("FracDiff Stationarity", f"{frac_val}", delta=frac_mem)
+qcol3.metric("Quant ML Model", "✅ ACTIVE (≥55%)" if ml_active else "⏸ OFFLINE", delta=f"{ml_prob:.1f}% Conviction" if ml_prob > 0 else "Scanning…")
 qcol4.metric(
     "ADX Trend Filter",
-    f"{adx_val:.1f} (" + ("Trending 🔥" if adx_val >= 22 else "Choppy ⏸") + ")" if adx_val > 0 else "Warming up…",
+    f"{adx_val:.1f}" if adx_val > 0 else "Warming up…",
+    delta="Trending 🔥" if adx_val >= 22 else ("Choppy ⏸" if adx_val > 0 else None),
 )
 qcol5.metric("RSI (14)", f"{rsi_val:.1f}" if rsi_val > 0 else "—")
 qcol6.metric(
-    "Continuous Retrainer",
-    "🔄 Running (24h)" if retrain_running else "⏸ Idle",
+    "Kelly Dynamic Sizer",
+    "Fractional Kelly",
+    delta="0.5% - 2.5% Adaptive",
 )
 
 # ---------------------------------------------------------------------------

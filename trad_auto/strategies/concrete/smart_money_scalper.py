@@ -21,6 +21,7 @@ from trad_auto.indicators.moving_averages import EMA, SMA
 from trad_auto.indicators.rsi import RSI
 from trad_auto.market_data.regime import MarketRegimeDetector, RegimeClassification
 from trad_auto.market_data.store import BarStore
+from trad_auto.math.fractional_diff import FractionalDifferentiator
 from trad_auto.strategies.base import BaseStrategy
 
 
@@ -101,6 +102,10 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         # Statistical Market Regime Detector (GMM / Hidden Markov)
         self._regime_detector = MarketRegimeDetector(min_bars_required=30)
         self._last_regime: RegimeClassification | None = None
+
+        # Fractional Differentiation Engine (Marcos López de Prado)
+        self._frac_diff = FractionalDifferentiator(d=0.40, threshold=1e-4)
+        self._last_frac_diff_val: float | None = None
 
         if self.enable_ml_filter:
             self._load_ml_model()
@@ -239,6 +244,9 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                 return []
             if self._last_regime.regime == MarketRegimeType.CHOP_SIDEWAYS and self.enable_adx_filter:
                 return []
+
+            closes_arr = np.array([float(b.close) for b in regime_bars], dtype=np.float64)
+            self._last_frac_diff_val = float(self._frac_diff.transform(closes_arr)[-1])
 
         # 3.1. ADX Regime Filter: Ensure market is not in flat sideways chop
         if self.enable_adx_filter and adx.is_ready and adx.value is not None:
@@ -475,4 +483,10 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                 if self._last_regime is not None
                 else "WARMING_UP"
             ),
+            "frac_diff_val": (
+                f"{self._last_frac_diff_val:.4f}"
+                if self._last_frac_diff_val is not None
+                else None
+            ),
+            "frac_diff_memory": f"d={self._frac_diff.d:.2f} ({self._frac_diff.get_memory_weight_ratio():.1%} Memory)",
         }
