@@ -366,9 +366,9 @@ if open_pos_list:
     st.dataframe(pos_data, use_container_width=True)
 
 # ---------------------------------------------------------------------------
-# SECTION 4: 22-FACTOR QUANT ML & STATISTICAL MARKET REGIME
+# SECTION 4: 🏛️ MICROSOFT QLIB ALPHA158 & CROSS-SECTIONAL ALPHA RANKER
 # ---------------------------------------------------------------------------
-st.markdown("### 🔬 Strategy Conviction, López de Prado Memory & Market Regime")
+st.markdown("### 🏛️ Microsoft Qlib Alpha158 & Cross-Sectional Multi-Asset Alpha Ranker")
 
 strat_info = data.get("strategy_info", {})
 s = strat_info.get("smart_money_scalper", {})
@@ -385,6 +385,12 @@ rsi_val = float(rsi_str) if rsi_str else 0.0
 
 frac_val = s.get("frac_diff_val") or "—"
 frac_mem = s.get("frac_diff_memory") or "d=0.40"
+
+cs_top = s.get("cs_top_asset") or "BTCUSDT"
+cs_spread = s.get("cs_spread") or "—"
+cs_disp = s.get("cs_dispersion") or "—"
+cs_regime = s.get("cs_regime") or "N/A"
+cs_tradeable = s.get("cs_tradeable_count", 0)
 
 regime_rec = s.get("regime_recommendation", "WARMING_UP")
 
@@ -405,20 +411,22 @@ regime_display = regime_map.get(regime_raw, regime_raw)
 regime_prob = s.get("regime_probability") or ""
 regime_val_str = f"{regime_display} {regime_prob}".strip()
 
+cs_regime_badge = {
+    "dispersed": "⚡ HIGH ALPHA",
+    "concentrated": "🎯 NORMAL",
+    "flat": "⏸ ZERO EDGE",
+}.get(cs_regime, cs_regime)
+
 qcol1.metric("Market Regime (GMM)", regime_val_str, delta=f"Action: {regime_rec}")
-qcol2.metric("FracDiff Stationarity", f"{frac_val}", delta=frac_mem)
-qcol3.metric("Quant ML Model", "✅ ACTIVE (≥55%)" if ml_active else "⏸ OFFLINE", delta=f"{ml_prob:.1f}% Conviction" if ml_prob > 0 else "Scanning…")
-qcol4.metric(
+qcol2.metric("Cross-Sectional #1", f"👑 {cs_top}", delta=f"Spread: {cs_spread} | {cs_regime_badge}")
+qcol3.metric("Alpha158 Matrix", "158 Factors", delta=f"Dispersion: {cs_disp}")
+qcol4.metric("Quant ML Model", "✅ ACTIVE" if ml_active else "⏸ OFFLINE", delta=f"{ml_prob:.1f}% Conviction" if ml_prob > 0 else "Scanning…")
+qcol5.metric(
     "ADX Trend Filter",
     f"{adx_val:.1f}" if adx_val > 0 else "Warming up…",
     delta="Trending 🔥" if adx_val >= 22 else ("Choppy ⏸" if adx_val > 0 else None),
 )
-qcol5.metric("RSI (14)", f"{rsi_val:.1f}" if rsi_val > 0 else "—")
-qcol6.metric(
-    "Kelly Dynamic Sizer",
-    "Fractional Kelly",
-    delta="0.5% - 2.5% Adaptive",
-)
+qcol6.metric("FracDiff Stationarity", f"{frac_val}", delta=frac_mem)
 
 # ---------------------------------------------------------------------------
 # SECTION 5: ⚖️ STATISTICAL ARBITRAGE & COINTEGRATION SPREAD (BTC / ETH)

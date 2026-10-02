@@ -409,6 +409,16 @@ class TradingEngine:
                 quantity_step=Decimal("0.1"),
                 min_quantity=Decimal("0.1"),
             ),
+            Instrument(
+                symbol="BNBUSDT",
+                exchange="BINANCE",
+                asset_class="CRYPTO",
+                currency="USDT",
+                tick_size=Decimal("0.01"),
+                lot_size=Decimal("0.01"),
+                quantity_step=Decimal("0.01"),
+                min_quantity=Decimal("0.01"),
+            ),
         ]
 
     def _build_default_strategies(self) -> list[BaseStrategy]:
@@ -426,7 +436,7 @@ class TradingEngine:
             ),
             SmartMoneyScalperStrategy(
                 strategy_id="smart_money_scalper",
-                symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+                symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"],
                 timeframes=["1m", "5m"],
             ),
         ]

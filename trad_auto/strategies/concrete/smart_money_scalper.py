@@ -23,6 +23,11 @@ from trad_auto.indicators.rsi import RSI
 from trad_auto.market_data.regime import MarketRegimeDetector, RegimeClassification
 from trad_auto.market_data.store import BarStore
 from trad_auto.math.fractional_diff import FractionalDifferentiator
+from trad_auto.quant.alpha158 import Alpha158Engine
+from trad_auto.quant.cross_sectional_ranker import (
+    CrossSectionalRanker,
+    CrossSectionalSnapshot,
+)
 from trad_auto.strategies.base import BaseStrategy
 
 
@@ -66,6 +71,9 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         enable_ml_filter: bool = True,
         ml_min_probability: float = 0.52,
         adaptive_policy: Any = None,
+        enable_cross_sectional: bool = True,
+        cross_sectional_ranker: CrossSectionalRanker | None = None,
+        alpha158_engine: Alpha158Engine | None = None,
     ) -> None:
         target_symbols = symbols or ["BTCUSDT"]
         target_timeframes = timeframes or ["1m", "5m"]
@@ -96,6 +104,10 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         self.enable_ml_filter = enable_ml_filter
         self.ml_min_probability = ml_min_probability
         self.adaptive_policy = adaptive_policy
+        self.enable_cross_sectional = enable_cross_sectional
+        self.alpha158_engine = alpha158_engine or Alpha158Engine()
+        self.cross_sectional_ranker = cross_sectional_ranker or CrossSectionalRanker()
+        self._last_cross_sectional_snapshot: CrossSectionalSnapshot | None = None
 
         self._ml_model: Any = None
         self._ml_metadata: dict[str, Any] | None = None
@@ -155,7 +167,13 @@ class SmartMoneyScalperStrategy(BaseStrategy):
             loaded = trainer.load_model("btc_scalper_ml")
             if loaded is not None:
                 self._ml_model, self._ml_metadata = loaded
-                self._feature_extractor = QuantFeatureExtractor()
+                f_names = self._ml_metadata.get("feature_names", []) if self._ml_metadata else []
+                if len(f_names) == 158:
+                    self._feature_extractor = self.alpha158_engine
+                else:
+                    self._feature_extractor = QuantFeatureExtractor()
+            else:
+                self._feature_extractor = self.alpha158_engine
         except Exception:
             pass
 
@@ -165,7 +183,10 @@ class SmartMoneyScalperStrategy(BaseStrategy):
 
         self._ml_model = model
         self._ml_metadata = metadata
-        if self._feature_extractor is None:
+        f_names = metadata.get("feature_names", []) if metadata else []
+        if len(f_names) == 158:
+            self._feature_extractor = self.alpha158_engine
+        else:
             self._feature_extractor = QuantFeatureExtractor()
 
     def on_bar_completed(self, bar: Bar, store: BarStore) -> list[TradeProposal]:
@@ -259,6 +280,49 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                 # Flat sideways chop detected: block trend scalping
                 return []
 
+        # 3.4. Cross-Sectional Multi-Asset Alpha Ranking Gate
+        # Institutional hedge fund standard: Rank all universe assets and trade ONLY the top-ranked asset
+        if (
+            self.enable_cross_sectional
+            and self.cross_sectional_ranker is not None
+            and self.alpha158_engine is not None
+            and len(self.symbols) > 1
+        ):
+            asset_features: dict[str, np.ndarray] = {}
+            for sym in self.symbols:
+                s_bars = store.get_bars(sym, bar.timeframe, count=65)
+                if len(s_bars) >= 61:
+                    s_candles = [
+                        {
+                            "open": float(b.open),
+                            "high": float(b.high),
+                            "low": float(b.low),
+                            "close": float(b.close),
+                            "volume": float(b.volume),
+                        }
+                        for b in s_bars
+                    ]
+                    try:
+                        X_sym, _, _ = self.alpha158_engine.extract_features(s_candles)
+                        asset_features[sym] = X_sym[-1:]
+                    except Exception:
+                        pass
+
+            if len(asset_features) >= 2:
+                cs_snapshot = self.cross_sectional_ranker.rank_assets(
+                    asset_features, self.alpha158_engine.FEATURE_NAMES
+                )
+                self._last_cross_sectional_snapshot = cs_snapshot
+
+                # Market dispersion filter: if market is flat/uncorrelated alpha is low, skip trading
+                should_trade, _ = self.cross_sectional_ranker.should_trade(cs_snapshot)
+                if not should_trade:
+                    return []
+
+                # Relative alpha filter: only allow entries on the #1 ranked asset!
+                if bar.symbol != cs_snapshot.top_asset:
+                    return []
+
         # 3.5. Quant Machine Learning Model Probability Gate
         if (
             self.enable_ml_filter
@@ -266,7 +330,8 @@ class SmartMoneyScalperStrategy(BaseStrategy):
             and self._feature_extractor is not None
         ):
             recent_bars = store.get_bars(bar.symbol, bar.timeframe, count=65)
-            if len(recent_bars) >= 60:
+            warmup_needed = 61 if isinstance(self._feature_extractor, Alpha158Engine) else 60
+            if len(recent_bars) >= warmup_needed:
                 raw_candles = [
                     {
                         "open": float(b.open),
@@ -509,4 +574,29 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                 else None
             ),
             "frac_diff_memory": f"d={self._frac_diff.d:.2f} ({self._frac_diff.get_memory_weight_ratio():.1%} Memory)",
+            "cs_regime": (
+                self._last_cross_sectional_snapshot.regime_label
+                if self._last_cross_sectional_snapshot is not None
+                else "N/A"
+            ),
+            "cs_top_asset": (
+                self._last_cross_sectional_snapshot.top_asset
+                if self._last_cross_sectional_snapshot is not None
+                else "N/A"
+            ),
+            "cs_spread": (
+                f"{self._last_cross_sectional_snapshot.spread:.2f}"
+                if self._last_cross_sectional_snapshot is not None
+                else "N/A"
+            ),
+            "cs_dispersion": (
+                f"{self._last_cross_sectional_snapshot.dispersion:.4f}"
+                if self._last_cross_sectional_snapshot is not None
+                else "N/A"
+            ),
+            "cs_tradeable_count": (
+                self._last_cross_sectional_snapshot.n_tradeable
+                if self._last_cross_sectional_snapshot is not None
+                else 0
+            ),
         }

@@ -37,10 +37,19 @@ class QuantModelTrainer:
         self,
         model_dir: str = "data/models",
         decision_threshold: float = 0.55,
+        feature_extractor: Any = None,
+        use_alpha158: bool = False,
     ) -> None:
         self.model_dir = model_dir
         self.decision_threshold = decision_threshold
-        self.feature_extractor = QuantFeatureExtractor()
+        if feature_extractor is not None:
+            self.feature_extractor = feature_extractor
+        elif use_alpha158:
+            from trad_auto.quant.alpha158 import Alpha158Engine
+
+            self.feature_extractor = Alpha158Engine()
+        else:
+            self.feature_extractor = QuantFeatureExtractor()
         self.labeler = TripleBarrierLabeler()
         self.downloader = BinanceDataDownloader()
         self.evaluator = WalkForwardEvaluator(decision_threshold=decision_threshold)

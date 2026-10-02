@@ -299,3 +299,61 @@ def test_smart_money_scalper_blocks_on_adx_chop() -> None:
     assert len(proposals) == 0
 
 
+def test_smart_money_scalper_cross_sectional_ranking_multi_asset() -> None:
+    """Verifies that cross-sectional ranking filters out lower-ranked assets."""
+    mock_analyzer = MagicMock(spec=BinanceSmartMoneyAnalyzer)
+    mock_analyzer.validate_proposal_alignment.return_value = (True, "Whales aligned Long")
+
+    mock_ranker = MagicMock()
+    mock_snapshot = MagicMock()
+    mock_snapshot.top_asset = "ETHUSDT"  # ETH is top asset
+    mock_snapshot.spread = 1.85
+    mock_snapshot.dispersion = 0.45
+    mock_snapshot.regime_label = "dispersed"
+    mock_snapshot.n_tradeable = 2
+    mock_ranker.rank_assets.return_value = mock_snapshot
+    mock_ranker.should_trade.return_value = (True, "Favorable")
+
+    strategy = SmartMoneyScalperStrategy(
+        strategy_id="scalper_multi_test",
+        symbols=["BTCUSDT", "ETHUSDT"],
+        timeframes=["1m"],
+        fast_ema_period=3,
+        slow_ema_period=5,
+        trend_ema_period=10,
+        rsi_period=5,
+        atr_period=5,
+        volume_multiplier=Decimal("1.0"),
+        rsi_long_upper=Decimal("100.0"),
+        smart_money_analyzer=mock_analyzer,
+        enable_cross_sectional=True,
+        cross_sectional_ranker=mock_ranker,
+        enable_ml_filter=False,
+    )
+
+    store = BarStore()
+    now = datetime(2026, 1, 1, 10, 0, tzinfo=UTC)
+
+    # Feed 65 bars for both BTCUSDT and ETHUSDT
+    proposals = []
+    for i in range(65):
+        t = now + timedelta(minutes=i)
+        p_btc = Decimal("50000.0") + Decimal(str(i * 20))
+        p_eth = Decimal("3000.0") + Decimal(str(i * 5))
+        bar_btc = _make_bar("BTCUSDT", "1m", t, close=p_btc, volume=Decimal("100.0"))
+        bar_eth = _make_bar("ETHUSDT", "1m", t, close=p_eth, volume=Decimal("100.0"))
+        store.add_bar(bar_btc)
+        store.add_bar(bar_eth)
+        proposals = strategy.on_bar_completed(bar_btc, store)
+
+    # When BTC bar is completed, because ETH is top_asset, BTC trade must be blocked!
+    assert len(proposals) == 0  # Blocked because BTC != top_asset (ETH)
+
+    # Check indicator snapshot includes cross-sectional telemetry
+    snap = strategy.get_indicator_snapshot("BTCUSDT", "1m")
+    assert snap["cs_top_asset"] == "ETHUSDT"
+    assert snap["cs_regime"] == "dispersed"
+    assert snap["cs_tradeable_count"] == 2
+
+
+
