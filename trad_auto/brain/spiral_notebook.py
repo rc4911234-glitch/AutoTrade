@@ -509,18 +509,29 @@ def synthesize_live_day_page(
     for idx in range(3):
         if idx < len(display_candidates):
             t = display_candidates[idx]
-            entry_p = float(t.get("entry_price", 100.0))
+            entry_p = float(t.get("entry_price") or 100.0)
             exit_p = float(t.get("exit_price") or entry_p * 1.01)
             sl_p = float(t.get("stop_loss") or entry_p * 0.99)
             tp_p = float(t.get("take_profit") or entry_p * 1.02)
-            pnl_val = float(t.get("realized_pnl", 0.0))
-            sym = t.get("symbol", "BTCUSDT")
-            side = t.get("side", "LONG")
-            outc = t.get("outcome", "WIN" if pnl_val >= 0 else "LOSS")
-            entry_time = t.get("entry_time", "10:00")
-            time_display = f"{entry_time[11:16]} - {t.get('exit_time', '11:00')[11:16]}" if len(entry_time) >= 16 else "10:00 - 11:30"
+            pnl_val = float(t.get("realized_pnl") or 0.0)
+            sym = str(t.get("symbol") or "BTCUSDT")
+            side = str(t.get("side") or "LONG")
+            raw_outc = str(t.get("outcome") or "")
+            outc = raw_outc if raw_outc in ("WIN", "LOSS") else ("WIN" if pnl_val >= 0 else "LOSS")
+
+            entry_time = str(t.get("entry_time") or "10:00")
+            raw_exit = t.get("exit_time")
+            exit_time_str = str(raw_exit) if raw_exit else ""
+            if len(entry_time) >= 16 and len(exit_time_str) >= 16:
+                time_display = f"{entry_time[11:16]} - {exit_time_str[11:16]}"
+            elif len(entry_time) >= 16:
+                time_display = f"{entry_time[11:16]} - ACTIVE"
+            else:
+                time_display = "10:00 - 11:30"
+
             rr = abs((tp_p - entry_p) / (entry_p - sl_p + 1e-6))
-            lesson = t.get("lesson_learned") or t.get("post_mortem_analysis") or "1:2 R:R bracket discipline maintained."
+            lesson = str(t.get("lesson_learned") or t.get("post_mortem_analysis") or "1:2 R:R bracket discipline maintained.")
+            qty_val = float(t.get("quantity") or 0.05)
 
             rendered_trades.append({
                 "trade_id": f"TRADE {idx+1}",
@@ -533,8 +544,8 @@ def synthesize_live_day_page(
                 "stop_loss": sl_p,
                 "target": tp_p,
                 "leverage": "5x",
-                "position_size": f"{t.get('quantity', 0.05):.3f} {sym[:3]}",
-                "risk_amount": f"${abs(entry_p - sl_p) * t.get('quantity', 0.05):,.1f} (1%)",
+                "position_size": f"{qty_val:.3f} {sym[:3]}",
+                "risk_amount": f"${abs(entry_p - sl_p) * qty_val:,.1f} (1%)",
                 "risk_reward": f"1 : {rr:.1f}",
                 "reasons": [
                     f"Alpha158 Factor Score: +1.84 z-score in {sym}",
