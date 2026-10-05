@@ -207,9 +207,14 @@ class DatabaseManager:
         busy_timeout_ms: int = 5000,
         database_url: str = "",
     ) -> None:
-        self._db_path = db_path
+        if db_path.startswith("postgresql://") or db_path.startswith("postgres://"):
+            self._database_url = db_path.strip()
+            self._db_path = "trad_auto.db"
+        else:
+            self._db_path = db_path
+            self._database_url = database_url.strip() if database_url else ""
+
         self._busy_timeout_ms = busy_timeout_ms
-        self._database_url = database_url.strip() if database_url else ""
         self._is_postgres = bool(
             self._database_url
             and (self._database_url.startswith("postgresql://") or self._database_url.startswith("postgres://"))
@@ -219,9 +224,9 @@ class DatabaseManager:
         if self._is_postgres:
             logger.info("DatabaseManager initialized with Supabase PostgreSQL backend.")
         else:
-            if db_path != ":memory:":
-                Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-            logger.info("DatabaseManager initialized with local SQLite backend: %s", db_path)
+            if self._db_path != ":memory:":
+                Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
+            logger.info("DatabaseManager initialized with local SQLite backend: %s", self._db_path)
 
         self._init_db()
 
