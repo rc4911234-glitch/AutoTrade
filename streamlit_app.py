@@ -1091,20 +1091,28 @@ with tab_book:
 
         tc_col1, tc_col2 = st.columns([40, 60], gap="medium")
         with tc_col1:
+            exit_p_val = selected_trade.get("exit_price")
+            exit_p_display = f"${float(exit_p_val):,.2f}" if exit_p_val is not None else "OPEN / PENDING"
+            pnl_val = float(selected_trade.get("realized_pnl", 0.0))
+            pnl_color = "#10b981" if pnl_val >= 0 else "#ef4444"
+            outcome_color = "#10b981" if selected_trade.get("outcome") == "WIN" else "#ef4444"
+            entry_p = float(selected_trade.get("entry_price", 0.0))
+            sl_p = float(selected_trade.get("stop_loss", 0.0))
+            tp_p = float(selected_trade.get("take_profit", 0.0))
             st.markdown(
                 f"""
                 <div style="background:#080d16;border:1px solid #1a273a;border-radius:6px;padding:12px;font-size:0.8rem;">
                     <div style="display:flex;justify-content:space-between;border-bottom:1px solid #1a273a;padding-bottom:6px;margin-bottom:8px;">
                         <span>Trade ID: <b style="color:#ffb000;">{selected_trade['trade_id']}</b></span>
-                        <span style="color:{'#10b981' if selected_trade['outcome']=='WIN' else '#ef4444'};font-weight:700;">{selected_trade['outcome']}</span>
+                        <span style="color:{outcome_color};font-weight:700;">{selected_trade['outcome']}</span>
                     </div>
                     <div style="line-height:1.7;color:#cbd5e1;">
                         • <b>Asset:</b> {selected_trade['symbol']} ({selected_trade['side']})<br/>
-                        • <b>Entry Price:</b> ${selected_trade['entry_price']:,.2f}<br/>
-                        • <b>Exit Price:</b> ${selected_trade['exit_price']:,.2f if selected_trade['exit_price'] else 0.0}<br/>
-                        • <b>Stop Loss:</b> ${selected_trade['stop_loss']:,.2f} | <b>Target:</b> ${selected_trade['take_profit']:,.2f}<br/>
+                        • <b>Entry Price:</b> ${entry_p:,.2f}<br/>
+                        • <b>Exit Price:</b> {exit_p_display}<br/>
+                        • <b>Stop Loss:</b> ${sl_p:,.2f} | <b>Target:</b> ${tp_p:,.2f}<br/>
                         • <b>Exit Reason:</b> <code>{selected_trade['exit_reason']}</code><br/>
-                        • <b>Realized PnL:</b> <b style="color:{'#10b981' if selected_trade['realized_pnl']>=0 else '#ef4444'};">${selected_trade['realized_pnl']:+,.2f} USDT</b><br/>
+                        • <b>Realized PnL:</b> <b style="color:{pnl_color};">${pnl_val:+,.2f} USDT</b><br/>
                         • <b>Time:</b> {selected_trade['entry_time'][:19].replace('T', ' ')}
                     </div>
                     <div style="margin-top:10px;padding-top:8px;border-top:1px solid #1a273a;">
