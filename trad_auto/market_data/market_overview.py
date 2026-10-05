@@ -240,25 +240,39 @@ def get_klines_dataframe(
         records = []
         for i in range(limit):
             c = float(closes[i])
+            v = float(np.random.uniform(50, 500))
+            tb = v * 0.52
             records.append({
                 "timestamp": pd.to_datetime(times[i], unit="ms", utc=True),
                 "open": c * 0.999,
                 "high": c * 1.002,
                 "low": c * 0.998,
                 "close": c,
-                "volume": float(np.random.uniform(50, 500)),
+                "volume": v,
+                "taker_buy_volume": tb,
             })
         df = pd.DataFrame(records)
     else:
         records = []
         for item in raw_data:
+            o_val = float(item[1])
+            h_val = float(item[2])
+            l_val = float(item[3])
+            c_val = float(item[4])
+            v_val = float(item[5])
+            if len(item) > 9:
+                tb_val = float(item[9])
+            else:
+                rng = max(h_val - l_val, 1e-8)
+                tb_val = v_val * max(0.0, min(1.0, 0.50 + 0.50 * ((c_val - o_val) / rng)))
             records.append({
                 "timestamp": pd.to_datetime(int(item[0]), unit="ms", utc=True),
-                "open": float(item[1]),
-                "high": float(item[2]),
-                "low": float(item[3]),
-                "close": float(item[4]),
-                "volume": float(item[5]),
+                "open": o_val,
+                "high": h_val,
+                "low": l_val,
+                "close": c_val,
+                "volume": v_val,
+                "taker_buy_volume": tb_val,
             })
         df = pd.DataFrame(records)
 
@@ -267,8 +281,13 @@ def get_klines_dataframe(
     df["ema21"] = df["close"].ewm(span=21, adjust=False).mean()
     df["ema50"] = df["close"].ewm(span=50, adjust=False).mean()
 
+    # Compute Order Flow Delta & Cumulative Volume Delta (CVD)
+    df["delta"] = (2.0 * df["taker_buy_volume"]) - df["volume"]
+    df["cvd"] = df["delta"].cumsum()
+
     _KLINE_CACHE[cache_key] = (now, df)
     return df
+
 
 
 # ---------------------------------------------------------------------------
@@ -382,5 +401,62 @@ def get_live_crypto_news(limit: int = 8) -> list[dict[str, Any]]:
     _NEWS_CACHE = articles
     _LAST_NEWS_FETCH = now
     return articles[:limit]
+
+
+# ---------------------------------------------------------------------------
+# Volume Profile (POC / VAH / VAL) and Order Flow CVD Analyzers
+# ---------------------------------------------------------------------------
+_VP_CACHE: dict[tuple[str, str, int], tuple[float, Any]] = {}
+_CVD_CACHE: dict[tuple[str, str, int], tuple[float, Any]] = {}
+_ORDERFLOW_TTL = 10.0
+
+
+def get_volume_profile(
+    symbol: str = "BTCUSDT",
+    interval: str = "15m",
+    limit: int = 80,
+    n_bins: int = 50,
+) -> Any:
+    """Computes real-time Volume Profile, POC, VAH, and VAL from live klines."""
+    global _VP_CACHE
+    now = time.time()
+    key = (symbol, interval, limit)
+    if key in _VP_CACHE:
+        cached_t, cached_res = _VP_CACHE[key]
+        if now - cached_t < _ORDERFLOW_TTL:
+            return cached_res
+
+    from trad_auto.quant.volume_profile import VolumeProfileEngine
+
+    df = get_klines_dataframe(symbol=symbol, interval=interval, limit=limit)
+    engine = VolumeProfileEngine(n_bins=n_bins, value_area_pct=0.70)
+    res = engine.compute_profile(df, symbol=symbol)
+    _VP_CACHE[key] = (now, res)
+    return res
+
+
+def get_cvd_analysis(
+    symbol: str = "BTCUSDT",
+    interval: str = "15m",
+    limit: int = 80,
+    window: int = 20,
+) -> Any:
+    """Computes Cumulative Volume Delta (CVD) and divergence classification."""
+    global _CVD_CACHE
+    now = time.time()
+    key = (symbol, interval, limit)
+    if key in _CVD_CACHE:
+        cached_t, cached_res = _CVD_CACHE[key]
+        if now - cached_t < _ORDERFLOW_TTL:
+            return cached_res
+
+    from trad_auto.quant.cvd_engine import CumulativeVolumeDeltaEngine
+
+    df = get_klines_dataframe(symbol=symbol, interval=interval, limit=limit)
+    engine = CumulativeVolumeDeltaEngine(lookback_window=window, divergence_threshold_pct=0.20)
+    res = engine.compute_cvd(df, symbol=symbol)
+    _CVD_CACHE[key] = (now, res)
+    return res
+
 
 

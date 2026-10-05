@@ -41,10 +41,12 @@ from trad_auto.brain.spiral_notebook import (
     synthesize_live_day_page,
 )
 from trad_auto.market_data.market_overview import (
+    get_cvd_analysis,
     get_klines_dataframe,
     get_live_crypto_news,
     get_market_overview,
     get_stat_arb_overview,
+    get_volume_profile,
 )
 from trad_auto.backtest.historical_arena import HistoricalArenaRunner
 from trad_auto.quant.derivatives_alpha import DerivativesAlphaEngine
@@ -747,13 +749,54 @@ with tab_floor:
             components.html(tv_html, height=470)
         else:
             kline_df = get_klines_dataframe(symbol=chart_sym, interval=chart_tf, limit=80)
+            vp_res = get_volume_profile(symbol=chart_sym, interval=chart_tf, limit=80)
+            cvd_res = get_cvd_analysis(symbol=chart_sym, interval=chart_tf, limit=80)
+
+            # Order Flow & Auction Profile Quick Status Ribbon
+            va_badge = (
+                '<span style="color:#10b981;font-weight:700;">▲ ABOVE VAH</span>'
+                if vp_res.value_area_relation == "ABOVE_VAH"
+                else (
+                    '<span style="color:#ef4444;font-weight:700;">▼ BELOW VAL</span>'
+                    if vp_res.value_area_relation == "BELOW_VAL"
+                    else '<span style="color:#ffb000;font-weight:700;">⇄ VALUE ROTATION</span>'
+                )
+            )
+            cvd_badge = (
+                '<span style="color:#10b981;font-weight:700;">🟢 BULL ABSORPTION</span>'
+                if cvd_res.divergence_signal == "BULLISH_ABSORPTION"
+                else (
+                    '<span style="color:#ef4444;font-weight:700;">🔴 BEAR EXHAUSTION</span>'
+                    if cvd_res.divergence_signal == "BEARISH_EXHAUSTION"
+                    else (
+                        '<span style="color:#00f2fe;font-weight:700;">⚡ TREND ALIGNED</span>'
+                        if "CONFIRMATION" in cvd_res.divergence_signal
+                        else '<span style="color:#94a3b8;">⚖ BALANCED</span>'
+                    )
+                )
+            )
+
+            st.markdown(
+                f"""
+                <div style="display:flex;align-items:center;justify-content:space-between;background:#080e18;border:1px solid #16263b;border-radius:4px;padding:4px 10px;margin-bottom:6px;font-size:0.75rem;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">
+                    <div><span style="color:#94a3b8;">POC:</span> <strong style="color:#ffb000;">${vp_res.poc_price:,.2f}</strong> ({vp_res.distance_to_poc_pct:+.2f}%)</div>
+                    <div><span style="color:#94a3b8;">VAH:</span> <strong style="color:#10b981;">${vp_res.vah_price:,.2f}</strong> | <span style="color:#94a3b8;">VAL:</span> <strong style="color:#ef4444;">${vp_res.val_price:,.2f}</strong> [{va_badge}]</div>
+                    <div><span style="color:#94a3b8;">CVD:</span> <strong style="color:#00f2fe;">{cvd_res.current_cvd:+,.1f}</strong> (Taker Buy: <strong>{cvd_res.delta_ratio*100:.1f}%</strong>)</div>
+                    <div><span style="color:#94a3b8;">Orderflow:</span> {cvd_badge}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
             fig = make_subplots(
                 rows=2,
                 cols=1,
                 shared_xaxes=True,
                 vertical_spacing=0.03,
-                row_heights=[0.75, 0.25],
+                row_heights=[0.72, 0.28],
+                specs=[[{"secondary_y": False}], [{"secondary_y": True}]],
             )
+            # Candlestick
             fig.add_trace(
                 go.Candlestick(
                     x=kline_df["timestamp"],
@@ -767,6 +810,7 @@ with tab_floor:
                 ),
                 row=1, col=1,
             )
+            # EMAs
             fig.add_trace(
                 go.Scatter(x=kline_df["timestamp"], y=kline_df["ema9"], name="Fast EMA (9)", line=dict(color="#00f2fe", width=1.4)),
                 row=1, col=1,
@@ -779,21 +823,62 @@ with tab_floor:
                 go.Scatter(x=kline_df["timestamp"], y=kline_df["ema50"], name="Trend EMA (50)", line=dict(color="#a855f7", width=1.4)),
                 row=1, col=1,
             )
+
+            # Volume Profile Horizontal Lines (POC, VAH, VAL)
+            if vp_res.poc_price > 0:
+                fig.add_hline(
+                    y=vp_res.poc_price,
+                    line=dict(color="#ffb000", width=1.5, dash="dash"),
+                    annotation_text=f"POC ${vp_res.poc_price:,.2f}",
+                    annotation_position="top left",
+                    annotation_font=dict(color="#ffb000", size=10),
+                    row=1, col=1,
+                )
+            if vp_res.vah_price > 0:
+                fig.add_hline(
+                    y=vp_res.vah_price,
+                    line=dict(color="#10b981", width=1.0, dash="dot"),
+                    annotation_text=f"VAH ${vp_res.vah_price:,.2f}",
+                    annotation_position="top left",
+                    annotation_font=dict(color="#10b981", size=9),
+                    row=1, col=1,
+                )
+            if vp_res.val_price > 0:
+                fig.add_hline(
+                    y=vp_res.val_price,
+                    line=dict(color="#ef4444", width=1.0, dash="dot"),
+                    annotation_text=f"VAL ${vp_res.val_price:,.2f}",
+                    annotation_position="bottom left",
+                    annotation_font=dict(color="#ef4444", size=9),
+                    row=1, col=1,
+                )
+
+            # Volume Bars
             vol_colors = ["#10b981" if c >= o else "#ef4444" for c, o in zip(kline_df["close"], kline_df["open"])]
             fig.add_trace(
-                go.Bar(x=kline_df["timestamp"], y=kline_df["volume"], marker_color=vol_colors, name="Volume", opacity=0.7),
+                go.Bar(x=kline_df["timestamp"], y=kline_df["volume"], marker_color=vol_colors, name="Volume", opacity=0.45),
                 row=2, col=1,
+                secondary_y=False,
             )
+            # Overlaid CVD Line
+            if "cvd" in kline_df.columns:
+                fig.add_trace(
+                    go.Scatter(x=kline_df["timestamp"], y=kline_df["cvd"], name="CVD (Delta Flow)", line=dict(color="#00f2fe", width=1.8)),
+                    row=2, col=1,
+                    secondary_y=True,
+                )
+
             fig.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="#06090e",
                 plot_bgcolor="#090d16",
                 margin=dict(l=10, r=10, t=5, b=5),
-                height=450,
+                height=460,
                 xaxis_rangeslider_visible=False,
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             )
             st.plotly_chart(fig, use_container_width=True)
+
 
         # -------------------------------------------------------------------
         # EXECUTION BLOTTER & TRADE JOURNAL (Below Chart)
@@ -1327,6 +1412,68 @@ with tab_deriv:
             "Quantitative Analysis": s_sig.summary,
         })
     st.dataframe(pd.DataFrame(deriv_rows), use_container_width=True, hide_index=True)
+
+    st.markdown("#### 🎯 Auction Market Volume Profile (POC / VAH / VAL) & Real-Time CVD Matrix")
+    st.caption("Auction Market Theory (AMT) value area boundaries and Cumulative Volume Delta (CVD) order flow divergence.")
+    
+    of_rows = []
+    for s_name in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"]:
+        try:
+            vp_s = get_volume_profile(symbol=s_name, interval="15m", limit=80)
+            cvd_s = get_cvd_analysis(symbol=s_name, interval="15m", limit=80)
+            
+            va_status = (
+                "▲ ABOVE VAH (Premium)"
+                if vp_s.value_area_relation == "ABOVE_VAH"
+                else (
+                    "▼ BELOW VAL (Discount)"
+                    if vp_s.value_area_relation == "BELOW_VAL"
+                    else "⇄ INSIDE VALUE (Rotation)"
+                )
+            )
+            
+            div_status = (
+                "🟢 BULL ABSORPTION"
+                if cvd_s.divergence_signal == "BULLISH_ABSORPTION"
+                else (
+                    "🔴 BEAR EXHAUSTION"
+                    if cvd_s.divergence_signal == "BEARISH_EXHAUSTION"
+                    else (
+                        "⚡ TREND CONFIRMED"
+                        if "CONFIRMATION" in cvd_s.divergence_signal
+                        else "⚖ BALANCED FLOW"
+                    )
+                )
+            )
+            
+            action = (
+                "Long Reversal Setup"
+                if cvd_s.divergence_signal == "BULLISH_ABSORPTION" or vp_s.value_area_relation == "BELOW_VAL"
+                else (
+                    "Short Reversal Setup"
+                    if cvd_s.divergence_signal == "BEARISH_EXHAUSTION" or vp_s.value_area_relation == "ABOVE_VAH"
+                    else "Value Area Rotation"
+                )
+            )
+
+            of_rows.append({
+                "Asset": s_name,
+                "Current Price": f"${vp_s.current_price:,.2f}",
+                "Point of Control (POC)": f"${vp_s.poc_price:,.2f}",
+                "Value Area (VAL - VAH)": f"${vp_s.val_price:,.2f} – ${vp_s.vah_price:,.2f}",
+                "Value Area State": va_status,
+                "POC Distance": f"{vp_s.distance_to_poc_pct:+.2f}%",
+                "CVD (Delta Flow)": f"{cvd_s.current_cvd:+,.1f}",
+                "Taker Buy Ratio": f"{cvd_s.delta_ratio*100:.1f}%",
+                "Order Flow Divergence": div_status,
+                "Auction Action": action,
+            })
+        except Exception:
+            pass
+
+    if of_rows:
+        st.dataframe(pd.DataFrame(of_rows), use_container_width=True, hide_index=True)
+
 
 
 # ===========================================================================

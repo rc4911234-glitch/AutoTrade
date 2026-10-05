@@ -28,7 +28,16 @@ from trad_auto.quant.cross_sectional_ranker import (
     CrossSectionalRanker,
     CrossSectionalSnapshot,
 )
+from trad_auto.quant.cvd_engine import (
+    CumulativeVolumeDeltaEngine,
+    CVDAnalysisResult,
+)
+from trad_auto.quant.volume_profile import (
+    VolumeProfileEngine,
+    VolumeProfileResult,
+)
 from trad_auto.strategies.base import BaseStrategy
+
 
 
 class SmartMoneyScalperStrategy(BaseStrategy):
@@ -74,6 +83,9 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         enable_cross_sectional: bool = True,
         cross_sectional_ranker: CrossSectionalRanker | None = None,
         alpha158_engine: Alpha158Engine | None = None,
+        enable_orderflow: bool = True,
+        volume_profile_engine: VolumeProfileEngine | None = None,
+        cvd_engine: CumulativeVolumeDeltaEngine | None = None,
     ) -> None:
         target_symbols = symbols or ["BTCUSDT"]
         target_timeframes = timeframes or ["1m", "5m"]
@@ -108,6 +120,14 @@ class SmartMoneyScalperStrategy(BaseStrategy):
         self.alpha158_engine = alpha158_engine or Alpha158Engine()
         self.cross_sectional_ranker = cross_sectional_ranker or CrossSectionalRanker()
         self._last_cross_sectional_snapshot: CrossSectionalSnapshot | None = None
+
+        # Order Flow & Auction Profile Engines
+        self.enable_orderflow = enable_orderflow
+        self.volume_profile_engine = volume_profile_engine or VolumeProfileEngine(n_bins=40, value_area_pct=0.70)
+        self.cvd_engine = cvd_engine or CumulativeVolumeDeltaEngine(lookback_window=20, divergence_threshold_pct=0.15)
+        self._last_volume_profile: dict[str, VolumeProfileResult] = {}
+        self._last_cvd_analysis: dict[str, CVDAnalysisResult] = {}
+
 
         self._ml_model: Any = None
         self._ml_metadata: dict[str, Any] | None = None
@@ -357,6 +377,20 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                 except Exception:
                     pass
 
+        # 3.6. Order Flow & Auction Profile Analytics (CVD + Volume Profile)
+        cvd_res: CVDAnalysisResult | None = None
+        vp_res: VolumeProfileResult | None = None
+        if self.enable_orderflow:
+            of_bars = store.get_bars(bar.symbol, bar.timeframe, count=40)
+            if len(of_bars) >= 10:
+                try:
+                    cvd_res = self.cvd_engine.compute_cvd(of_bars, symbol=bar.symbol)
+                    vp_res = self.volume_profile_engine.compute_profile(of_bars, symbol=bar.symbol)
+                    self._last_cvd_analysis[bar.symbol] = cvd_res
+                    self._last_volume_profile[bar.symbol] = vp_res
+                except Exception:
+                    pass
+
         proposals: list[TradeProposal] = []
 
         # 4. Bullish Long Scalp Setup
@@ -380,6 +414,10 @@ class SmartMoneyScalperStrategy(BaseStrategy):
             ):
                 return []
 
+            # Order Flow CVD Exhaustion Check (Prevent buying into smart money distribution traps)
+            if cvd_res is not None and not cvd_res.allow_long:
+                return []
+
             # Verify Smart Money Whale flow alignment
             aligned, sm_reason = self.smart_money_analyzer.validate_proposal_alignment(
                 bar.symbol, OrderSide.BUY
@@ -396,6 +434,16 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                     adx_info = (
                         f", ADX={adx.value:.1f}"
                         if (adx.is_ready and adx.value is not None)
+                        else ""
+                    )
+                    cvd_info = (
+                        f", CVD={cvd_res.divergence_signal}"
+                        if cvd_res is not None
+                        else ""
+                    )
+                    vp_info = (
+                        f", POC=${vp_res.poc_price:,.2f}"
+                        if vp_res is not None
                         else ""
                     )
                     ml_conf = (
@@ -417,7 +465,7 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                             reason=(
                                 f"Smart Money Long Scalp: EMA9 ({fast_val:.2f}) > "
                                 f"EMA21 ({slow_val:.2f}) > EMA50 ({trend_val:.2f}), "
-                                f"RSI={rsi_val:.1f}{qlib_info}{adx_info}, {sm_reason}"
+                                f"RSI={rsi_val:.1f}{qlib_info}{adx_info}{cvd_info}{vp_info}, {sm_reason}"
                             ),
                         )
                     )
@@ -443,6 +491,10 @@ class SmartMoneyScalperStrategy(BaseStrategy):
             ):
                 return []
 
+            # Order Flow CVD Absorption Check (Prevent shorting into aggressive limit buyer absorption)
+            if cvd_res is not None and not cvd_res.allow_short:
+                return []
+
             # Verify Smart Money Whale flow alignment
             aligned, sm_reason = self.smart_money_analyzer.validate_proposal_alignment(
                 bar.symbol, OrderSide.SELL
@@ -459,6 +511,16 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                     adx_info = (
                         f", ADX={adx.value:.1f}"
                         if (adx.is_ready and adx.value is not None)
+                        else ""
+                    )
+                    cvd_info = (
+                        f", CVD={cvd_res.divergence_signal}"
+                        if cvd_res is not None
+                        else ""
+                    )
+                    vp_info = (
+                        f", POC=${vp_res.poc_price:,.2f}"
+                        if vp_res is not None
                         else ""
                     )
                     ml_conf = (
@@ -480,7 +542,7 @@ class SmartMoneyScalperStrategy(BaseStrategy):
                             reason=(
                                 f"Smart Money Short Scalp: EMA9 ({fast_val:.2f}) < "
                                 f"EMA21 ({slow_val:.2f}) < EMA50 ({trend_val:.2f}), "
-                                f"RSI={rsi_val:.1f}{qlib_info}{adx_info}, {sm_reason}"
+                                f"RSI={rsi_val:.1f}{qlib_info}{adx_info}{cvd_info}{vp_info}, {sm_reason}"
                             ),
                         )
                     )

@@ -9,10 +9,23 @@ from .cross_sectional_ranker import (
     CrossSectionalSnapshot,
     AssetRanking,
 )
+from .cvd_engine import (
+    CumulativeVolumeDeltaEngine,
+    CVDAnalysisResult,
+)
+from .volume_profile import (
+    VolumeProfileEngine,
+    VolumeProfileResult,
+)
 
 __all__ = [
     "Alpha158Engine",
     "CrossSectionalRanker",
     "CrossSectionalSnapshot",
     "AssetRanking",
+    "CumulativeVolumeDeltaEngine",
+    "CVDAnalysisResult",
+    "VolumeProfileEngine",
+    "VolumeProfileResult",
 ]
+
