@@ -38,7 +38,7 @@ class QuantModelTrainer:
         model_dir: str = "data/models",
         decision_threshold: float = 0.55,
         feature_extractor: Any = None,
-        use_alpha158: bool = False,
+        use_alpha158: bool = True,
     ) -> None:
         self.model_dir = model_dir
         self.decision_threshold = decision_threshold

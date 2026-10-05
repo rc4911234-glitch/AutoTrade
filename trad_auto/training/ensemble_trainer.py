@@ -101,10 +101,17 @@ class MasterMentorTrainer:
         self,
         model_dir: str = "data/models",
         decision_threshold: float = 0.52,
+        use_alpha158: bool = True,
     ) -> None:
         self.model_dir = model_dir
         self.decision_threshold = decision_threshold
-        self.feature_extractor = QuantFeatureExtractor()
+        self.use_alpha158 = use_alpha158
+        if use_alpha158:
+            from trad_auto.quant.alpha158 import Alpha158Engine
+
+            self.feature_extractor = Alpha158Engine()
+        else:
+            self.feature_extractor = QuantFeatureExtractor()
         self.labeler = TripleBarrierLabeler(
             take_profit_ratio=0.0040, # +40 bps target (2:1 R:R)
             stop_loss_ratio=0.0020,   # -20 bps stop loss
@@ -129,8 +136,8 @@ class MasterMentorTrainer:
         if len(candles) < 200:
             raise ValueError(f"Insufficient market data acquired: {len(candles)} bars")
 
-        # 1. Feature Extraction (22 Alpha Factors)
-        logger.info("🔬 [MasterMentor] Computing 22 Microstructure Alpha Features...")
+        # 1. Feature Extraction
+        logger.info("🔬 [MasterMentor] Computing Microstructure Alpha Features (Alpha158=%s)...", self.use_alpha158)
         X, feature_names, valid_indices = self.feature_extractor.extract_features(candles)
 
         # 2. Triple Barrier Labeling (2:1 Risk-to-Reward Geometry)
@@ -138,9 +145,15 @@ class MasterMentorTrainer:
         y, returns = self.labeler.label_candles(candles, valid_indices, direction="LONG")
 
         # 2.1 Condition on Strategy Setup Bars (Filter out flat noise chop)
-        d9_idx = feature_names.index("dist_ema_9")
-        d50_idx = feature_names.index("dist_ema_50")
-        setup_mask = np.array([row[d9_idx] > 0 and row[d50_idx] > 0 for row in X])
+        if "dist_ema_9" in feature_names and "dist_ema_50" in feature_names:
+            d9_idx = feature_names.index("dist_ema_9")
+            d50_idx = feature_names.index("dist_ema_50")
+            setup_mask = np.array([row[d9_idx] > 0 and row[d50_idx] > 0 for row in X])
+        elif "ROC_5" in feature_names:
+            roc_idx = feature_names.index("ROC_5")
+            setup_mask = np.array([row[roc_idx] >= 1.0 for row in X])
+        else:
+            setup_mask = np.ones(len(X), dtype=bool)
 
         if np.sum(setup_mask) >= 80:
             X_train_data = X[setup_mask]

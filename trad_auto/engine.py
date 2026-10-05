@@ -61,6 +61,7 @@ from trad_auto.strategies.base import BaseStrategy
 from trad_auto.strategies.concrete.atr_breakout import ATRBreakoutStrategy
 from trad_auto.strategies.concrete.mean_reversion import BollingerMeanReversionStrategy
 from trad_auto.strategies.concrete.smart_money_scalper import SmartMoneyScalperStrategy
+from trad_auto.strategies.concrete.statistical_arbitrage import StatisticalArbitrageStrategy
 from trad_auto.strategies.manager import StrategyManager
 from trad_auto.training.auto_retrainer import ModelAutoRetrainer
 
@@ -437,6 +438,12 @@ class TradingEngine:
             SmartMoneyScalperStrategy(
                 strategy_id="smart_money_scalper",
                 symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"],
+                timeframes=["1m", "5m"],
+            ),
+            StatisticalArbitrageStrategy(
+                strategy_id="stat_arb_btc_eth",
+                symbol_x="BTCUSDT",
+                symbol_y="ETHUSDT",
                 timeframes=["1m", "5m"],
             ),
         ]
