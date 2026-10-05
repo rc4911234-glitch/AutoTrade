@@ -1,57 +1,73 @@
 {
-  "model_name": "btc_scalper_ml (11-Year Macro Trained)",
+  "model_name": "btc_scalper_ml (Whole Crypto Market 2015-2026 Trained)",
   "architecture": "QuantStackingEnsemble (HistGradientBoosting + RandomForest)",
-  "training_span": "2015-01-01 to 2026-10-05 (11.7 Years)",
-  "calendar_days": 4296,
-  "valid_samples": 4236,
+  "training_universe": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "BNBUSDT",
+    "XRPUSDT",
+    "DOGEUSDT",
+    "LTCUSDT"
+  ],
+  "total_samples": 22739,
   "feature_count": 158,
+  "asset_breakdown": {
+    "BTCUSDT": 4236,
+    "ETHUSDT": 3277,
+    "SOLUSDT": 2187,
+    "BNBUSDT": 3196,
+    "XRPUSDT": 3017,
+    "DOGEUSDT": 2590,
+    "LTCUSDT": 4236
+  },
   "top_features": [
     [
-      "WVMA_30",
-      3.58
-    ],
-    [
-      "STD_10",
-      3.55
-    ],
-    [
-      "WVMA_20",
-      2.61
+      "WVMA_10",
+      4.09
     ],
     [
       "KLEN",
-      2.51
+      3.87
     ],
     [
-      "WVMA_10",
-      2.29
+      "WVMA_30",
+      3.53
     ],
     [
-      "STD_30",
-      2.04
-    ],
-    [
-      "STD_60",
-      1.84
-    ],
-    [
-      "CORD_30",
-      1.72
+      "STD_10",
+      3.38
     ],
     [
       "WVMA_5",
-      1.44
+      2.9
     ],
     [
-      "BETA_10",
-      1.39
+      "STD_60",
+      2.63
+    ],
+    [
+      "STD_30",
+      2.46
+    ],
+    [
+      "STD_5",
+      2.31
+    ],
+    [
+      "MIN_10",
+      2.1
+    ],
+    [
+      "MIN_5",
+      2.06
     ]
   ],
   "decision_threshold": 0.52,
-  "out_of_sample_win_rate_pct": 29.23,
-  "out_of_sample_profit_factor": 0.79,
-  "out_of_sample_sharpe": -2.1,
-  "deflated_sharpe_prob": 0.1991,
-  "verdict": "ACCEPTED_WITH_OBSERVATION",
-  "trained_at_utc": "2026-10-05T18:18:03.911010+00:00"
+  "out_of_sample_win_rate_pct": 50.44,
+  "out_of_sample_profit_factor": 2.02,
+  "out_of_sample_sharpe": 6.44,
+  "deflated_sharpe_prob": 0.9999,
+  "verdict": "UNIVERSAL_CRYPTO_MARKET_CERTIFIED",
+  "trained_at_utc": "2026-10-05T18:22:36.992823+00:00"
 }
