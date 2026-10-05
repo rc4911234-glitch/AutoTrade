@@ -34,6 +34,12 @@ from trad_auto.brain.playbook_reader import (
     get_available_dates,
     load_all_journal_trades,
 )
+from trad_auto.brain.spiral_notebook import (
+    generate_binance_replay_chart,
+    get_reference_day_page,
+    render_spiral_notebook_html_page,
+    synthesize_live_day_page,
+)
 from trad_auto.market_data.market_overview import (
     get_klines_dataframe,
     get_live_crypto_news,
@@ -687,7 +693,7 @@ st.markdown(f'<div class="bb-ticker-bar">{"".join(ticker_items_html)}</div>', un
 # ---------------------------------------------------------------------------
 tab_floor, tab_book, tab_arena, tab_deriv, tab_qlib, tab_news, tab_risk = st.tabs([
     "🖥️ Master Trading Floor",
-    "📖 Pro Trader Playbook & Notes",
+    "📖 Pro Trader Journal Notebook & Diary",
     "🏟️ Historical Arena Tournament",
     "🌊 Derivatives Alpha & Order Flow",
     "🏛️ Microsoft Qlib & Regime Allocator",
@@ -1004,132 +1010,152 @@ with tab_floor:
 
 
 # ===========================================================================
-# TAB 2: 📖 PRO TRADER PLAYBOOK & LEARNING DIARY (The Trader's Book)
+# TAB 2: 📖 PRO TRADER PHYSICAL JOURNAL NOTEBOOK & CONTINUOUS PLAYBOOK
 # ===========================================================================
 with tab_book:
-    st.markdown("### 📖 Pro Trader Playbook & Continuous Learning Journal")
-    st.caption("Episodic trade reflection engine modeled after institutional quantitative hedge funds. Every trade post-mortem, causal attribution, and empirical rule is stored permanently in Supabase PostgreSQL.")
+    st.markdown("### 📖 Pro Trader Physical Journal Notebook & Continuous Playbook")
+    st.caption(
+        "Authentic desk trading journal modeled directly after institutional trading desk notebooks. "
+        "Features the physical spiral ring binding, 4-box macro analysis, embedded Binance 5m candlestick "
+        "case studies with entry/SL/exit callout badges, daily PnL accounting, empirical rules, and next-day preparation."
+    )
 
     all_journal_trades = load_all_journal_trades()
     available_dates = get_available_dates(all_journal_trades)
 
-    if not available_dates:
-        available_dates = ["2026-10-05"]
+    all_book_pages = [d for d in available_dates if d != "2025-04-15"] + ["2025-04-15"]
+    if not all_book_pages:
+        all_book_pages = ["2026-10-05", "2025-04-15"]
 
-    top_d_col1, top_d_col2 = st.columns([40, 60], gap="medium")
-    with top_d_col1:
-        selected_date = st.selectbox(
-            "📅 Select Trading Session Date",
-            available_dates,
-            index=0,
-            format_func=lambda d: f"📅 Session: {d} {'(Today / Live)' if d == available_dates[0] else ''}",
+    if "book_current_date" not in st.session_state:
+        st.session_state["book_current_date"] = all_book_pages[0]
+    if st.session_state["book_current_date"] not in all_book_pages:
+        st.session_state["book_current_date"] = all_book_pages[0]
+
+    curr_idx = all_book_pages.index(st.session_state["book_current_date"])
+
+    # Page Flipping Navigation Controls
+    col_prev, col_select, col_next = st.columns([20, 60, 20], gap="small")
+    with col_prev:
+        if st.button("◀ Previous Page", use_container_width=True, disabled=(curr_idx >= len(all_book_pages) - 1)):
+            st.session_state["book_current_date"] = all_book_pages[min(len(all_book_pages) - 1, curr_idx + 1)]
+            st.rerun()
+
+    with col_select:
+        def _format_book_label(d: str) -> str:
+            if d == "2025-04-15":
+                return "📖 Blueprint Reference: 15 Apr 2025 (Day 120 / 365) [Exact Photo Match]"
+            elif d == all_book_pages[0]:
+                return f"🔴 Today / Live Active Session: {d} (Day 278 / 365)"
+            else:
+                return f"📅 Journal Session: {d}"
+
+        chosen_page = st.selectbox(
+            "Select Notebook Page / Session Date",
+            all_book_pages,
+            index=curr_idx,
+            format_func=_format_book_label,
+            label_visibility="collapsed",
         )
-    with top_d_col2:
+        if chosen_page != st.session_state["book_current_date"]:
+            st.session_state["book_current_date"] = chosen_page
+            st.rerun()
+
+    with col_next:
+        if st.button("Next Page ▶", use_container_width=True, disabled=(curr_idx <= 0)):
+            st.session_state["book_current_date"] = all_book_pages[max(0, curr_idx - 1)]
+            st.rerun()
+
+    # Quick Jump Shortcuts & Supabase Stats
+    c_sc1, c_sc2, c_sc3 = st.columns([36, 36, 28], gap="small")
+    with c_sc1:
+        if st.button("📖 Flip to Reference Blueprint (15 Apr 2025)", use_container_width=True):
+            st.session_state["book_current_date"] = "2025-04-15"
+            st.rerun()
+    with c_sc2:
+        if st.button("🔴 Flip to Today's Live Active Session", use_container_width=True):
+            st.session_state["book_current_date"] = all_book_pages[0]
+            st.rerun()
+    with c_sc3:
         st.markdown(
             f"""
-            <div style="background:#080d16;border:1px solid #1a273a;border-radius:6px;padding:8px 12px;margin-top:24px;display:flex;align-items:center;gap:12px;">
-                <span class="pro-rule-badge">SUPABASE PG</span>
-                <span style="font-size:0.75rem;color:#94a3b8;">Session Table: <b>trade_journal</b> | Synced Trades: <b>{len(all_journal_trades)}</b></span>
+            <div style="background:#080d16;border:1px solid #1a273a;border-radius:6px;padding:6px 10px;text-align:center;font-size:0.75rem;color:#94a3b8;">
+                Page: <b>{curr_idx + 1} of {len(all_book_pages)}</b> | Supabase Trades: <b>{len(all_journal_trades)}</b>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-    day_trades = [t for t in all_journal_trades if t.get("entry_time", "")[:10] == selected_date]
-    pro_notes = build_daily_pro_notes(selected_date, day_trades)
+    # Compile the active notebook page data
+    active_date = st.session_state["book_current_date"]
+    day_trades = [t for t in all_journal_trades if t.get("entry_time", "")[:10] == active_date]
 
-    # 1. Pro Trader Scorecard
-    s_c1, s_c2, s_c3, s_c4, s_c5 = st.columns(5)
-    s_c1.metric("Total Trades", pro_notes["total_trades"])
-    s_c2.metric("Wins / Losses", f"{pro_notes['wins']}W / {pro_notes['losses']}L")
-    s_c3.metric("Win Rate %", f"{pro_notes['win_rate']}%")
-    pnl_val = pro_notes["net_pnl"]
-    s_c4.metric("Realized PnL", f"${pnl_val:+,.2f} USDT", delta=f"{'+' if pnl_val >= 0 else ''}{pnl_val:.2f}")
-    s_c5.metric("Capital Discipline", "100%", delta="1:2 R:R Stops Kept")
-
-    # 2. Pro Trader Desk Log & Market Narrative
-    st.markdown(
-        f"""
-        <div class="pro-notebook-card">
-            <div class="pro-notebook-header">
-                <div>
-                    <span class="pro-notebook-title">📓 PRO TRADER DESK NOTES — {selected_date}</span>
-                    <div style="font-size:0.75rem;color:#64748b;margin-top:3px;">Market Regime Identified: <b style="color:#38bdf8;">{pro_notes['regime_title']}</b></div>
-                </div>
-                <span class="pro-rule-badge">LIVE AI REFLECTION</span>
-            </div>
-            <div class="pro-trader-notes">
-                <b>📌 Market Context & Strategic Narrative:</b><br/>
-                {pro_notes['desk_thesis']}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # 3. AI Core Empirical Rules Learned
-    st.markdown("#### 💡 Key Lessons Learned by System Today (Stored in Supabase)")
-    for idx, rule_text in enumerate(pro_notes["lessons"], start=1):
-        st.markdown(
-            f"""
-            <div style="background:#080d16;border-left:3px solid #ffb000;border:1px solid #1a273a;border-radius:4px;padding:8px 12px;margin-bottom:6px;font-size:0.8rem;color:#e2e8f0;">
-                <span class="pro-rule-badge">RULE #{idx}</span>
-                <span>{rule_text}</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    # 4. Individual Trade Case Studies & Visual Candlestick Screenshot Replay
-    st.markdown("#### 🔍 Trade Case Studies & Visual Candlestick Screenshot Replay")
-    if day_trades:
-        trade_options = [
-            f"[{t['trade_id'][:8]}] {t['symbol']} {t['side']} - {t['outcome']} (${t['realized_pnl']:+,.2f})"
-            for t in day_trades
-        ]
-        chosen_trade_label = st.selectbox("Select Trade to Inspect Post-Mortem & Visual Chart Replay", trade_options, index=0)
-        chosen_idx = trade_options.index(chosen_trade_label)
-        selected_trade = day_trades[chosen_idx]
-
-        tc_col1, tc_col2 = st.columns([40, 60], gap="medium")
-        with tc_col1:
-            exit_p_val = selected_trade.get("exit_price")
-            exit_p_display = f"${float(exit_p_val):,.2f}" if exit_p_val is not None else "OPEN / PENDING"
-            pnl_val = float(selected_trade.get("realized_pnl", 0.0))
-            pnl_color = "#10b981" if pnl_val >= 0 else "#ef4444"
-            outcome_color = "#10b981" if selected_trade.get("outcome") == "WIN" else "#ef4444"
-            entry_p = float(selected_trade.get("entry_price", 0.0))
-            sl_p = float(selected_trade.get("stop_loss", 0.0))
-            tp_p = float(selected_trade.get("take_profit", 0.0))
-            st.markdown(
-                f"""
-                <div style="background:#080d16;border:1px solid #1a273a;border-radius:6px;padding:12px;font-size:0.8rem;">
-                    <div style="display:flex;justify-content:space-between;border-bottom:1px solid #1a273a;padding-bottom:6px;margin-bottom:8px;">
-                        <span>Trade ID: <b style="color:#ffb000;">{selected_trade['trade_id']}</b></span>
-                        <span style="color:{outcome_color};font-weight:700;">{selected_trade['outcome']}</span>
-                    </div>
-                    <div style="line-height:1.7;color:#cbd5e1;">
-                        • <b>Asset:</b> {selected_trade['symbol']} ({selected_trade['side']})<br/>
-                        • <b>Entry Price:</b> ${entry_p:,.2f}<br/>
-                        • <b>Exit Price:</b> {exit_p_display}<br/>
-                        • <b>Stop Loss:</b> ${sl_p:,.2f} | <b>Target:</b> ${tp_p:,.2f}<br/>
-                        • <b>Exit Reason:</b> <code>{selected_trade['exit_reason']}</code><br/>
-                        • <b>Realized PnL:</b> <b style="color:{pnl_color};">${pnl_val:+,.2f} USDT</b><br/>
-                        • <b>Time:</b> {selected_trade['entry_time'][:19].replace('T', ' ')}
-                    </div>
-                    <div style="margin-top:10px;padding-top:8px;border-top:1px solid #1a273a;">
-                        <span style="color:#ffb000;font-weight:700;">PRO TRADER TAKEAWAY:</span><br/>
-                        <span style="color:#94a3b8;font-style:italic;">"{selected_trade['lesson_learned']}"</span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        with tc_col2:
-            fig_replay = create_trade_replay_figure(selected_trade)
-            st.plotly_chart(fig_replay, use_container_width=True)
+    if active_date == "2025-04-15":
+        page_obj = get_reference_day_page()
     else:
-        st.info("No trades recorded on this date.")
+        try:
+            live_ov = get_market_overview()
+        except Exception:
+            live_ov = {}
+        page_obj = synthesize_live_day_page(active_date, day_trades, live_ov)
+
+    # Generate Binance 5m Replay Candlestick Charts
+    chart_htmls = {}
+    for i, t in enumerate(page_obj["trades"], start=1):
+        try:
+            fig = generate_binance_replay_chart(
+                symbol=t["symbol"],
+                side=t["side"],
+                entry_price=float(t["entry"]),
+                exit_price=float(t["exit"]),
+                stop_loss=float(t["stop_loss"]),
+                take_profit=float(t["target"]),
+                outcome=t["outcome"],
+            )
+            chart_htmls[f"trade_{i}"] = fig.to_html(include_plotlyjs=False, full_html=False)
+        except Exception as exc:
+            chart_htmls[f"trade_{i}"] = "<div style='height:195px;background:#0c1322;'></div>"
+
+    cod = page_obj["chart_of_day"]
+    try:
+        cod_fig = generate_binance_replay_chart(
+            symbol=cod["symbol"],
+            side=cod["side"],
+            entry_price=float(cod["entry"]),
+            exit_price=float(cod["exit"]),
+            stop_loss=float(cod["stop_loss"]),
+            take_profit=float(cod["target"]),
+            outcome=cod["outcome"],
+        )
+        chart_htmls["chart_of_day"] = cod_fig.to_html(include_plotlyjs=False, full_html=False)
+    except Exception as exc:
+        chart_htmls["chart_of_day"] = "<div style='height:195px;background:#0c1322;'></div>"
+
+    # Render Physical Spiral Notebook Page
+    full_notebook_html = render_spiral_notebook_html_page(page_obj, chart_htmls)
+    components.html(full_notebook_html, height=1380, scrolling=True)
+
+    # Deep-Dive Telemetry Blotter
+    with st.expander("🗄️ Supabase PostgreSQL Telemetry & Raw Trade Blotter", expanded=False):
+        st.markdown(f"**Session Date:** `{active_date}` | **Stored Database Records:** `{len(day_trades)}`")
+        if day_trades:
+            df_trades = pd.DataFrame([
+                {
+                    "Trade ID": str(t.get("trade_id"))[:12],
+                    "Symbol": str(t.get("symbol")),
+                    "Side": str(t.get("side")),
+                    "Entry": float(t.get("entry_price", 0.0)),
+                    "Exit": float(t.get("exit_price") or 0.0),
+                    "Outcome": str(t.get("outcome")),
+                    "Realized PnL ($)": float(t.get("realized_pnl", 0.0)),
+                    "Exit Reason": str(t.get("exit_reason")),
+                    "Lesson Learned": str(t.get("lesson_learned")),
+                }
+                for t in day_trades
+            ])
+            st.dataframe(df_trades, use_container_width=True)
+        else:
+            st.caption("No individual raw database rows stored for this specific session date.")
 
 
 # ===========================================================================
