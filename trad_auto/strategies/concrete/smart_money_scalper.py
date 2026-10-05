@@ -180,22 +180,27 @@ class SmartMoneyScalperStrategy(BaseStrategy):
     def _load_ml_model(self) -> None:
         """Loads trained Quant ML model artifact if available."""
         try:
-            from trad_auto.training.features import QuantFeatureExtractor
+            from pathlib import Path
+            import joblib
             from trad_auto.training.trainer import QuantModelTrainer
+
+            model_dir = Path("data/models")
+            champ_file = model_dir / "lean_champion_stacking_model.joblib"
+            if champ_file.exists():
+                self._ml_model = joblib.load(champ_file)
+                self._feature_extractor = self.alpha158_engine
+                return
 
             trainer = QuantModelTrainer()
             loaded = trainer.load_model("btc_scalper_ml")
             if loaded is not None:
                 self._ml_model, self._ml_metadata = loaded
-                f_names = self._ml_metadata.get("feature_names", []) if self._ml_metadata else []
-                if len(f_names) == 158:
-                    self._feature_extractor = self.alpha158_engine
-                else:
-                    self._feature_extractor = QuantFeatureExtractor()
+                self._feature_extractor = self.alpha158_engine
             else:
                 self._feature_extractor = self.alpha158_engine
         except Exception:
-            pass
+            self._feature_extractor = self.alpha158_engine
+
 
     def hot_reload_model(self, model: Any, metadata: dict[str, Any]) -> None:
         """Atomically hot-reloads a freshly re-trained ML model into the live strategy."""
