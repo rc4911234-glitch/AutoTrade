@@ -1023,9 +1023,10 @@ with tab_book:
     all_journal_trades = load_all_journal_trades()
     available_dates = get_available_dates(all_journal_trades)
 
-    all_book_pages = [d for d in available_dates if d != "2025-04-15"] + ["2025-04-15"]
+    recent_4_days = sorted([d for d in available_dates if d != "2025-04-15"])
+    all_book_pages = recent_4_days + ["2025-04-15"]
     if not all_book_pages:
-        all_book_pages = ["2026-10-05", "2025-04-15"]
+        all_book_pages = ["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2025-04-15"]
 
     if "book_current_date" not in st.session_state:
         st.session_state["book_current_date"] = all_book_pages[0]
@@ -1034,21 +1035,23 @@ with tab_book:
 
     curr_idx = all_book_pages.index(st.session_state["book_current_date"])
 
-    # Page Flipping Navigation Controls
+    # Page Flipping Navigation Controls (Chronological Book Order: Day 1 -> Day 4)
     col_prev, col_select, col_next = st.columns([20, 60, 20], gap="small")
     with col_prev:
-        if st.button("◀ Previous Page", use_container_width=True, disabled=(curr_idx >= len(all_book_pages) - 1)):
-            st.session_state["book_current_date"] = all_book_pages[min(len(all_book_pages) - 1, curr_idx + 1)]
+        if st.button("◀ Previous Page", use_container_width=True, disabled=(curr_idx <= 0)):
+            st.session_state["book_current_date"] = all_book_pages[curr_idx - 1]
             st.rerun()
 
     with col_select:
         def _format_book_label(d: str) -> str:
             if d == "2025-04-15":
-                return "📖 Blueprint Reference: 15 Apr 2025 (Day 120 / 365) [Exact Photo Match]"
-            elif d == all_book_pages[0]:
-                return f"🔴 Today / Live Active Session: {d} (Day 278 / 365)"
-            else:
-                return f"📅 Journal Session: {d}"
+                return "📖 Reference Blueprint: 15 Apr 2025 (Day 120 / 365) [Exact Photo Match]"
+            try:
+                day_num = recent_4_days.index(d) + 1
+                is_today = " (Today / Live)" if d == recent_4_days[-1] else ""
+                return f"📓 Page {day_num} of {len(recent_4_days)}: Session {d}{is_today}"
+            except Exception:
+                return f"📅 Session: {d}"
 
         chosen_page = st.selectbox(
             "Select Notebook Page / Session Date",
@@ -1062,29 +1065,24 @@ with tab_book:
             st.rerun()
 
     with col_next:
-        if st.button("Next Page ▶", use_container_width=True, disabled=(curr_idx <= 0)):
-            st.session_state["book_current_date"] = all_book_pages[max(0, curr_idx - 1)]
+        if st.button("Next Page ▶", use_container_width=True, disabled=(curr_idx >= len(all_book_pages) - 1)):
+            st.session_state["book_current_date"] = all_book_pages[curr_idx + 1]
             st.rerun()
 
     # Quick Jump Shortcuts & Supabase Stats
-    c_sc1, c_sc2, c_sc3 = st.columns([36, 36, 28], gap="small")
+    c_sc1, c_sc2, c_sc3 = st.columns([33, 33, 34], gap="small")
     with c_sc1:
-        if st.button("📖 Flip to Reference Blueprint (15 Apr 2025)", use_container_width=True):
-            st.session_state["book_current_date"] = "2025-04-15"
+        if st.button("⏮️ Flip to Day 1 (2026-10-02)", use_container_width=True):
+            st.session_state["book_current_date"] = recent_4_days[0]
             st.rerun()
     with c_sc2:
-        if st.button("🔴 Flip to Today's Live Active Session", use_container_width=True):
-            st.session_state["book_current_date"] = all_book_pages[0]
+        if st.button("⏭️ Flip to Today (2026-10-05)", use_container_width=True):
+            st.session_state["book_current_date"] = recent_4_days[-1]
             st.rerun()
     with c_sc3:
-        st.markdown(
-            f"""
-            <div style="background:#080d16;border:1px solid #1a273a;border-radius:6px;padding:6px 10px;text-align:center;font-size:0.75rem;color:#94a3b8;">
-                Page: <b>{curr_idx + 1} of {len(all_book_pages)}</b> | Supabase Trades: <b>{len(all_journal_trades)}</b>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        if st.button("📖 Blueprint (15 Apr 2025)", use_container_width=True):
+            st.session_state["book_current_date"] = "2025-04-15"
+            st.rerun()
 
     # Compile the active notebook page data
     active_date = st.session_state["book_current_date"]

@@ -129,13 +129,21 @@ def generate_binance_replay_chart(
         col=1,
     )
 
+    def _fmt_price_callout(val: float) -> str:
+        if val >= 10000:
+            return f"{val:,.0f}"
+        elif val >= 1.0:
+            return f"{val:,.2f}"
+        else:
+            return f"{val:,.4f}"
+
     # Add Callout Pills matching the user's notebook photo
     # Entry Pill (Blue)
     entry_idx = 1
     fig.add_annotation(
         x=times[entry_idx],
         y=opens[entry_idx],
-        text=f"<b>Entry {entry_price:,.0f}</b>" if entry_price > 100 else f"<b>Entry {entry_price:,.2f}</b>",
+        text=f"<b>Entry {_fmt_price_callout(entry_price)}</b>",
         showarrow=True,
         arrowhead=2,
         arrowsize=1,
@@ -157,7 +165,7 @@ def generate_binance_replay_chart(
     fig.add_annotation(
         x=times[sl_idx],
         y=stop_loss,
-        text=f"<b>SL {stop_loss:,.0f}</b>" if stop_loss > 100 else f"<b>SL {stop_loss:,.2f}</b>",
+        text=f"<b>SL {_fmt_price_callout(stop_loss)}</b>",
         showarrow=True,
         arrowhead=2,
         arrowsize=1,
@@ -179,7 +187,7 @@ def generate_binance_replay_chart(
         fig.add_annotation(
             x=times[-4],
             y=take_profit,
-            text=f"<b>Target {take_profit:,.0f}</b>" if take_profit > 100 else f"<b>Target {take_profit:,.2f}</b>",
+            text=f"<b>Target {_fmt_price_callout(take_profit)}</b>",
             showarrow=True,
             arrowhead=2,
             arrowsize=1,
@@ -202,7 +210,7 @@ def generate_binance_replay_chart(
     fig.add_annotation(
         x=times[-1],
         y=exit_price,
-        text=f"<b>Exit {exit_price:,.0f}</b>" if exit_price > 100 else f"<b>Exit {exit_price:,.2f}</b>",
+        text=f"<b>Exit {_fmt_price_callout(exit_price)}</b>",
         showarrow=True,
         arrowhead=2,
         arrowsize=1,
@@ -794,7 +802,12 @@ def render_spiral_notebook_html_page(page: dict[str, Any], chart_htmls: dict[str
 
         reasons_html = "".join(f"<li>{r}</li>" for r in t["reasons"])
         def _fmt_p(val: float) -> str:
-            return f"{val:,.0f}" if val >= 100 else f"{val:,.2f}"
+            if val >= 10000:
+                return f"{val:,.1f}"
+            elif val >= 1.0:
+                return f"{val:,.2f}"
+            else:
+                return f"{val:,.4f}"
 
         entry_str = _fmt_p(float(t['entry']))
         exit_str = _fmt_p(float(t['exit']))
