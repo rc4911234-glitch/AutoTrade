@@ -286,7 +286,7 @@ class TradingEngine:
         ):
             self.live_feeder = BinanceLiveFeeder(
                 event_bus=self.event_bus,
-                symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+                symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"],
                 timeframe="1m",
                 poll_interval_sec=5.0,
             )

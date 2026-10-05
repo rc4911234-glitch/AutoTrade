@@ -1,0 +1,288 @@
+{
+  "cumulative": {
+    "total_trades": 66,
+    "wins": 11,
+    "losses": 53,
+    "win_rate_pct": 16.7,
+    "net_pnl": -282.51,
+    "balance": 9717.49
+  },
+  "days": {
+    "2026-10-02": {
+      "trades_count": 16,
+      "wins": 1,
+      "losses": 15,
+      "win_rate_pct": 6.2,
+      "realized_pnl": -25.7,
+      "symbol_breakdown": {
+        "BTCUSDT": 5,
+        "ETHUSDT": 8,
+        "SOLUSDT": 3
+      },
+      "sample_trades": [
+        {
+          "id": "41ff229b",
+          "symbol": "BTCUSDT",
+          "side": "LONG",
+          "entry": 84808.93,
+          "exit": 84721.64027117175,
+          "pnl": -1.43,
+          "outcome": "LOSS",
+          "reason": "STOP_LOSS_HIT",
+          "lesson": "Losses are the standard cost of doing business in quantitative trading. Strict stops guarantee survival."
+        },
+        {
+          "id": "598b74ec",
+          "symbol": "ETHUSDT",
+          "side": "SHORT",
+          "entry": 2680.85,
+          "exit": 2678.27745489062,
+          "pnl": 0.75,
+          "outcome": "WIN",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "In UNKNOWN regimes, asymmetric 1:2 R:R brackets yield superior expectancy. Continue letting high-probability winners run to full profit target."
+        },
+        {
+          "id": "6bc7582c",
+          "symbol": "ETHUSDT",
+          "side": "SHORT",
+          "entry": 2654.72,
+          "exit": 2662.2792953094,
+          "pnl": -3.29,
+          "outcome": "LOSS",
+          "reason": "STOP_LOSS_HIT",
+          "lesson": "Never chase trades at momentum extremes; wait for shallow pullback toward VWAP/EMA."
+        },
+        {
+          "id": "d52dfef4",
+          "symbol": "SOLUSDT",
+          "side": "SHORT",
+          "entry": 117.6,
+          "exit": 118.061805,
+          "pnl": -0.05,
+          "outcome": "LOSS",
+          "reason": "STOP_LOSS_HIT",
+          "lesson": "Losses are the standard cost of doing business in quantitative trading. Strict stops guarantee survival."
+        },
+        {
+          "id": "c48937ea",
+          "symbol": "SOLUSDT",
+          "side": "SHORT",
+          "entry": 117.88,
+          "exit": 118.401839,
+          "pnl": -4.88,
+          "outcome": "LOSS",
+          "reason": "STOP_LOSS_HIT",
+          "lesson": "Losses are the standard cost of doing business in quantitative trading. Strict stops guarantee survival."
+        }
+      ]
+    },
+    "2026-10-03": {
+      "trades_count": 9,
+      "wins": 3,
+      "losses": 5,
+      "win_rate_pct": 33.3,
+      "realized_pnl": -230.05,
+      "symbol_breakdown": {
+        "BTCUSDT": 5,
+        "ETHUSDT": 3,
+        "SOLUSDT": 1
+      },
+      "sample_trades": [
+        {
+          "id": "09e43013",
+          "symbol": "BTCUSDT",
+          "side": "SHORT",
+          "entry": 84492.71,
+          "exit": 84537.98921912655,
+          "pnl": -0.96,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "50a9226f",
+          "symbol": "BTCUSDT",
+          "side": "LONG",
+          "entry": 84547.73,
+          "exit": 84593.69856532726,
+          "pnl": 0.32,
+          "outcome": "WIN",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "In UNKNOWN regimes, asymmetric 1:2 R:R brackets yield superior expectancy. Continue letting high-probability winners run to full profit target."
+        },
+        {
+          "id": "178230ae",
+          "symbol": "ETHUSDT",
+          "side": "LONG",
+          "entry": 2669.54,
+          "exit": 2670.8386713470627,
+          "pnl": 0.28,
+          "outcome": "WIN",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "In UNKNOWN regimes, asymmetric 1:2 R:R brackets yield superior expectancy. Continue letting high-probability winners run to full profit target."
+        },
+        {
+          "id": "882b1820",
+          "symbol": "BTCUSDT",
+          "side": "LONG",
+          "entry": 84658.93,
+          "exit": 84614.95627563825,
+          "pnl": -0.95,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "429fb9e5",
+          "symbol": "BTCUSDT",
+          "side": "LONG",
+          "entry": 84631.22,
+          "exit": 64052.17131197148,
+          "pnl": -226.72,
+          "outcome": "LOSS",
+          "reason": "STOP_LOSS_HIT",
+          "lesson": "Losses are the standard cost of doing business in quantitative trading. Strict stops guarantee survival."
+        }
+      ]
+    },
+    "2026-10-04": {
+      "trades_count": 9,
+      "wins": 0,
+      "losses": 9,
+      "win_rate_pct": 0.0,
+      "realized_pnl": -8.56,
+      "symbol_breakdown": {
+        "ETHUSDT": 3,
+        "BTCUSDT": 5,
+        "SOLUSDT": 1
+      },
+      "sample_trades": [
+        {
+          "id": "83a61996",
+          "symbol": "ETHUSDT",
+          "side": "SHORT",
+          "entry": 2700.22,
+          "exit": 2701.3451545047,
+          "pnl": -0.92,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "4dd943c6",
+          "symbol": "ETHUSDT",
+          "side": "LONG",
+          "entry": 2702.34,
+          "exit": 2701.48473000945,
+          "pnl": -0.82,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "afd630d5",
+          "symbol": "BTCUSDT",
+          "side": "LONG",
+          "entry": 85186.83,
+          "exit": 85156.93496934856,
+          "pnl": -0.8,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "595e7afc",
+          "symbol": "ETHUSDT",
+          "side": "LONG",
+          "entry": 2699.8,
+          "exit": 2698.0952384925,
+          "pnl": -1.13,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "1459cc07",
+          "symbol": "SOLUSDT",
+          "side": "SHORT",
+          "entry": 121.35,
+          "exit": 121.472146,
+          "pnl": -1.5,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        }
+      ]
+    },
+    "2026-10-05": {
+      "trades_count": 32,
+      "wins": 7,
+      "losses": 24,
+      "win_rate_pct": 21.9,
+      "realized_pnl": -18.21,
+      "symbol_breakdown": {
+        "BTCUSDT": 12,
+        "ETHUSDT": 15,
+        "SOLUSDT": 5
+      },
+      "sample_trades": [
+        {
+          "id": "2c90a200",
+          "symbol": "BTCUSDT",
+          "side": "LONG",
+          "entry": 86470.33,
+          "exit": 86384.7807709887,
+          "pnl": -1.42,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "55a83540",
+          "symbol": "BTCUSDT",
+          "side": "LONG",
+          "entry": 86434.69,
+          "exit": 86374.95224543955,
+          "pnl": -1.13,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "6bf796a9",
+          "symbol": "ETHUSDT",
+          "side": "SHORT",
+          "entry": 2718.04,
+          "exit": 2719.99795209795,
+          "pnl": -1.19,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "a5360c2b",
+          "symbol": "BTCUSDT",
+          "side": "SHORT",
+          "entry": 85894.93,
+          "exit": 85940.03950213575,
+          "pnl": -0.97,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        },
+        {
+          "id": "760b2c5d",
+          "symbol": "BTCUSDT",
+          "side": "LONG",
+          "entry": 86112.06,
+          "exit": 86045.4516762918,
+          "pnl": -1.21,
+          "outcome": "LOSS",
+          "reason": "TAKE_PROFIT_HIT",
+          "lesson": "Avoid jumping on micro-breakouts during UNKNOWN conditions; wait for 1-minute candle close confirmation."
+        }
+      ]
+    }
+  }
+}
